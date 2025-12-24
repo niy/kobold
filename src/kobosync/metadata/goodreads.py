@@ -1,11 +1,14 @@
 import contextlib
 import urllib.parse
+from typing import TYPE_CHECKING
 
 from bs4 import BeautifulSoup
 
 from ..logging_config import get_logger
 from .base import RateLimitedProvider
-from .types import BookMetadata
+
+if TYPE_CHECKING:
+    from .types import BookMetadata
 
 logger = get_logger(__name__)
 

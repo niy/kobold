@@ -1,8 +1,11 @@
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from kobosync.utils.hashing import get_file_hash
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestFileHash:

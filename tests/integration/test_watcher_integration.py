@@ -6,9 +6,7 @@ file events and enqueues jobs appropriately.
 
 import asyncio
 import contextlib
-from collections.abc import AsyncGenerator, Generator
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from sqlalchemy import create_engine
@@ -18,6 +16,10 @@ from kobosync.config import Settings
 from kobosync.job_queue import JobQueue
 from kobosync.models import Job, JobType
 from kobosync.watcher import watch_directories
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Generator
+    from pathlib import Path
 
 
 @pytest.fixture

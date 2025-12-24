@@ -1,14 +1,17 @@
 import asyncio
 import contextlib
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from sqlmodel import Session, col, select
-from tests.conftest import IntegrationContext
 
 from kobosync.models import Book, Job
 from kobosync.watcher import watch_directories
 from kobosync.worker import worker
+
+if TYPE_CHECKING:
+    from tests.conftest import IntegrationContext
 
 
 @pytest.mark.asyncio

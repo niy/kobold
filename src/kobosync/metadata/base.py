@@ -2,11 +2,14 @@ import asyncio
 import random
 import time
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 import httpx
 
 from ..logging_config import get_logger
-from .types import BookMetadata
+
+if TYPE_CHECKING:
+    from .types import BookMetadata
 
 logger = get_logger(__name__)
 

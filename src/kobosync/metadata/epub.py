@@ -6,10 +6,12 @@ import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from ..logging_config import get_logger
-from .types import BookMetadata
+
+if TYPE_CHECKING:
+    from .types import BookMetadata
 
 logger = get_logger(__name__)
 

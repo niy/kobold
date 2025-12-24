@@ -37,7 +37,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.14"
 
       - name: Install dependencies
         run: uv sync --frozen --all-extras --dev
@@ -83,12 +83,11 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.14"
 
       - name: Install dependencies
         run: uv sync --frozen --all-extras --dev
 
-      # Run tests with a dedicated tmp directory for isolation
       - name: Run Tests
         env:
           KS_USER_TOKEN: "dummy_token"

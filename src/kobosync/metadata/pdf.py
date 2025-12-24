@@ -4,12 +4,14 @@ import shutil
 import tempfile
 from datetime import UTC
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pypdf import PdfReader, PdfWriter
 
 from ..logging_config import get_logger
-from .types import BookMetadata
+
+if TYPE_CHECKING:
+    from .types import BookMetadata
 
 logger = get_logger(__name__)
 

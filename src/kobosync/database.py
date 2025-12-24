@@ -1,10 +1,11 @@
-from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from sqlmodel import Session, SQLModel, create_engine
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from sqlalchemy.engine import Engine
 
 from .config import get_settings
@@ -16,7 +17,7 @@ from .models import Book, Job, ReadingState  # noqa: F401
 logger = get_logger(__name__)
 
 
-def _create_engine() -> "Engine":
+def _create_engine() -> Engine:
     connect_args = {
         "check_same_thread": False,
         "timeout": 30,

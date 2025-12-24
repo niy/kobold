@@ -11,9 +11,8 @@ and self-healing capabilities.
 """
 
 import asyncio
-from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from fastapi import FastAPI
 
@@ -28,6 +27,9 @@ from .scanner import ScannerService
 from .scheduler import schedule_periodic_scans
 from .watcher import watch_directories
 from .worker import worker
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 HOST: Final[str] = "0.0.0.0"
 PORT: Final[int] = 8000

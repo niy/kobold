@@ -1,9 +1,12 @@
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, Mock
 
 import pytest
 
 from kobosync.scanner import ScannerService
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestScanner:

@@ -1,9 +1,12 @@
-from collections.abc import Generator
-from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from pathlib import Path
 
 
 @pytest.fixture

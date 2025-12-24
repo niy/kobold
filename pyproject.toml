@@ -3,7 +3,7 @@ name = "kobosync"
 version = "0.1.0"
 description = "Headless Kobo library synchronization daemon"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "beautifulsoup4>=4.14.3",
     "fastapi>=0.127.0",
@@ -67,7 +67,7 @@ markers = [
 # ─────────────────────────────────────────────────────────────────────────────
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.14"
 mypy_path = ["src"]
 packages = ["kobosync"]
 strict = true
@@ -103,7 +103,7 @@ disallow_untyped_decorators = false
 # ─────────────────────────────────────────────────────────────────────────────
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py314"
 line-length = 88
 src = ["src", "tests"]
 
