@@ -1,11 +1,8 @@
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 
 from kobosync.metadata.epub import EpubMetadataExtractor
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class TestEpubMetadataExtractor:

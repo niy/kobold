@@ -1,22 +1,18 @@
 import asyncio
 import sys
+import threading
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
+from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine
 
 from kobosync.config import Settings, get_settings
 from kobosync.database import get_session_dependency
 from kobosync.job_queue import JobQueue
 from kobosync.main import app
-
-if TYPE_CHECKING:
-    import threading
-    from collections.abc import Callable, Generator
-
-    from sqlalchemy.engine import Engine
 
 pytest_plugins = [
     "tests.fixtures.mocks",

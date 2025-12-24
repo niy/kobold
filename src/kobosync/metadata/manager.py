@@ -1,17 +1,14 @@
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
+from ..config import Settings
 from ..logging_config import get_logger
 from .amazon import AmazonProvider
 from .epub import EpubMetadataExtractor
 from .goodreads import GoodreadsProvider
 from .pdf import PdfMetadataExtractor
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-    from ..config import Settings
-    from .types import BookMetadata
+from .types import BookMetadata
 
 logger = get_logger(__name__)
 

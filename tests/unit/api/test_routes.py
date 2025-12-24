@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
@@ -10,9 +10,6 @@ from kobosync.api.proxy import KoboProxyService
 from kobosync.config import Settings
 from kobosync.models import Book, ReadingState
 from kobosync.utils.kobo_token import KoboSyncToken
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 @pytest.fixture

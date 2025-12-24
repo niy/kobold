@@ -1,7 +1,7 @@
 import asyncio
 import contextlib
 import zipfile
-from typing import TYPE_CHECKING
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -12,9 +12,6 @@ from tests.conftest import IntegrationContext
 from kobosync.config import Settings
 from kobosync.models import Book
 from kobosync.watcher import watch_directories
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 @pytest.fixture

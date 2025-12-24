@@ -1,16 +1,12 @@
 import asyncio
 import threading
-from typing import TYPE_CHECKING
+from collections.abc import Callable, Generator
 
 import pytest
+from sqlalchemy.engine import Engine
 
-if TYPE_CHECKING:
-    from collections.abc import Callable, Generator
-
-    from sqlalchemy.engine import Engine
-
-    from kobosync.config import Settings
-    from kobosync.job_queue import JobQueue
+from kobosync.config import Settings
+from kobosync.job_queue import JobQueue
 
 
 @pytest.fixture

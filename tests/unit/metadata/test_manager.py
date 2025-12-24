@@ -1,12 +1,9 @@
-from typing import TYPE_CHECKING
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from kobosync.metadata.manager import MetadataManager
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class TestMetadataManager:

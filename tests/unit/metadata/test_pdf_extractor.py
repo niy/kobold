@@ -1,12 +1,9 @@
-from typing import TYPE_CHECKING
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from kobosync.metadata.pdf import PdfMetadataExtractor
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class TestPdfMetadataExtractor:

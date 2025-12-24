@@ -1,18 +1,17 @@
+from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from sqlmodel import Session, SQLModel, create_engine
-
-if TYPE_CHECKING:
-    from collections.abc import Generator
-
-    from sqlalchemy.engine import Engine
 
 from .config import get_settings
 from .logging_config import get_logger
 
 # Import models to register them with SQLModel metadata
 from .models import Book, Job, ReadingState  # noqa: F401
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Engine
 
 logger = get_logger(__name__)
 

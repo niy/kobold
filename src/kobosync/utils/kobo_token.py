@@ -1,7 +1,7 @@
 import base64
 import json
 from dataclasses import asdict, dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 if TYPE_CHECKING:
     from fastapi import Request
@@ -14,7 +14,7 @@ class KoboSyncToken:
     rawKoboSyncToken: str | None = None
 
     @classmethod
-    def from_base64(cls, token_str: str) -> KoboSyncToken:
+    def from_base64(cls, token_str: str) -> Self:
         try:
             json_str = base64.b64decode(token_str).decode("utf-8")
             data = json.loads(json_str)
@@ -27,7 +27,7 @@ class KoboSyncToken:
         return base64.b64encode(json_str.encode("utf-8")).decode("utf-8")
 
     @classmethod
-    def from_request(cls, request: Request) -> KoboSyncToken:
+    def from_request(cls, request: Request) -> Self:
         header = request.headers.get("X-Kobo-SyncToken")
         if not header:
             return cls()

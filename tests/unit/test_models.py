@@ -1,5 +1,7 @@
-import time
+from datetime import timedelta
 from uuid import uuid4
+
+import time_machine
 
 from kobosync.models import Book, ReadingState
 
@@ -13,8 +15,8 @@ class TestBookModel:
         )
         original_updated = book.updated_at
 
-        time.sleep(0.01)
-        book.mark_updated()
+        with time_machine.travel(original_updated + timedelta(seconds=1), tick=False):
+            book.mark_updated()
 
         assert book.updated_at > original_updated
 
@@ -39,7 +41,7 @@ class TestReadingStateModel:
         state = ReadingState(book_id=uuid4())
         original = state.last_modified
 
-        time.sleep(0.01)
-        state.mark_updated()
+        with time_machine.travel(original + timedelta(seconds=1), tick=False):
+            state.mark_updated()
 
         assert state.last_modified > original
