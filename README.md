@@ -1,5 +1,9 @@
 # KoboSync
 
+[![License](https://img.shields.io/github/license/niy/kobosync)](LICENSE)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/niy/kobosync/ci.yml)](https://github.com/niy/kobosync/actions/workflows/ci.yml)
+[![Python Version](https://img.shields.io/badge/python-3.13-blue)](pyproject.toml)
+
 KoboSync is a lightweight service that synchronizes a local eBook collection with Kobo eReaders. It automates file ingestion, enriches content with metadata, and serves books via the Kobo Sync API.
 
 **[Documentation](https://niy.github.io/kobosync/)**
@@ -74,3 +78,7 @@ For detailed instructions, refer to the [Device Setup Guide](docs/device_setup.m
 The application consists of a core Python process that handles file watching, metadata fetching, and API requests. Data is stored in a structured directory format.
 
 For more information, see the [Architecture Overview](docs/architecture.md).
+
+## License
+
+Distributed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE) for more information.
