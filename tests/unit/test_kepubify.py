@@ -24,7 +24,9 @@ class TestKepubifyBinary:
         self, kepubify_binary: KepubifyBinary
     ) -> None:
         kepubify_binary.bin_dir.mkdir(parents=True)
-        local_path = kepubify_binary.bin_dir / kepubify_binary._get_platform_binary_name()
+        local_path = (
+            kepubify_binary.bin_dir / kepubify_binary._get_platform_binary_name()
+        )
         local_path.touch()
 
         with patch("shutil.which", return_value=None):
@@ -85,7 +87,6 @@ class TestKepubifyBinary:
 
             assert result == "/usr/bin/kepubify"
             mock_resolve.assert_called_once()
-
 
     @pytest.mark.asyncio
     async def test_ensure_returns_cached_path(

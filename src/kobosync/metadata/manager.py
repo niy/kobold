@@ -33,7 +33,6 @@ class MetadataManager:
         metadata: BookMetadata = {}
         internal_isbn: str | None = None
 
-
         if filepath:
             internal_meta = self._extract_internal_metadata(filepath)
 
@@ -62,26 +61,22 @@ class MetadataManager:
             if result:
                 return self._merge_metadata(metadata, result)
 
-
         query = f"{title} {author}".strip() if author else title
         log.info("Strategy 2: Amazon by query", query=query)
         result = await self._amazon.fetch_metadata(query)
         if result:
             return self._merge_metadata(metadata, result)
 
-
         log.info("Strategy 3: Goodreads fallback", query=query)
         result = await self._goodreads.fetch_metadata(query)
         if result:
             return self._merge_metadata(metadata, result)
-
 
         if filepath:
             log.info("Strategy 4: Filename parsing")
             filename_meta = self._parse_filename(filepath)
             if filename_meta:
                 return self._merge_metadata(metadata, filename_meta)
-
 
         log.debug("No external metadata found, using internal only")
         fallback: BookMetadata = cast("BookMetadata", {"title": title, **metadata})
@@ -116,7 +111,6 @@ class MetadataManager:
                 }
 
         return None
-
 
     def embed_metadata(
         self,

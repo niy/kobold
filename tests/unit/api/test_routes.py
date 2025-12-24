@@ -80,10 +80,11 @@ class TestInitialization:
     def test_catch_all_proxy(self, app_client: TestClient) -> None:
         mock_proxy = AsyncMock(spec=KoboProxyService)
         from fastapi import Response
+
         mock_proxy.proxy_request.return_value = Response(
             content=b'{"proxied": true}',
             status_code=201,
-            headers={"X-Custom-Header": "test-value"}
+            headers={"X-Custom-Header": "test-value"},
         )
 
         app_client.app.dependency_overrides[KoboProxyService] = lambda: mock_proxy
@@ -186,7 +187,7 @@ class TestLibrarySync:
         with patch("kobosync.api.routes.logger") as mock_logger:
             response = app_client.get(
                 "/api/kobo/test_token/v1/library/sync",
-                headers={"X-Kobo-SyncToken": token_str}
+                headers={"X-Kobo-SyncToken": token_str},
             )
             assert response.status_code == 200
             mock_logger.bind.return_value.warning.assert_called_with(
@@ -197,8 +198,12 @@ class TestLibrarySync:
         mock_proxy = AsyncMock(spec=KoboProxyService)
         mock_proxy.fetch_kobo_sync.return_value = (
             200,
-            {"X-Kobo-SyncToken": KoboSyncToken(rawKoboSyncToken="new-remote-token").to_base64()},
-            []
+            {
+                "X-Kobo-SyncToken": KoboSyncToken(
+                    rawKoboSyncToken="new-remote-token"
+                ).to_base64()
+            },
+            [],
         )
         app_client.app.dependency_overrides[KoboProxyService] = lambda: mock_proxy
 
@@ -217,7 +222,7 @@ class TestLibrarySync:
         mock_proxy.fetch_kobo_sync.return_value = (
             200,
             {"X-Kobo-Sync": "some-value"},
-            []
+            [],
         )
         app_client.app.dependency_overrides[KoboProxyService] = lambda: mock_proxy
 
@@ -241,8 +246,11 @@ class TestDownload:
 
         assert response.status_code == 404
 
-    def test_download_book_missing_file_on_disk(self, app_client: TestClient, temp_db: str) -> None:
+    def test_download_book_missing_file_on_disk(
+        self, app_client: TestClient, temp_db: str
+    ) -> None:
         from sqlmodel import Session, create_engine
+
         engine = create_engine(temp_db, connect_args={"check_same_thread": False})
 
         book_id = str(uuid4())
@@ -252,7 +260,7 @@ class TestDownload:
                 title="Test",
                 file_path="/tmp/missing.epub",
                 file_hash="hash",
-                file_size=100
+                file_size=100,
             )
             session.add(book)
             session.commit()
@@ -355,6 +363,7 @@ class TestCoverImages:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.headers = {"content-type": "image/jpeg"}
+
         async def iter_bytes():
             yield b"remote "
             yield b"image"
@@ -378,8 +387,11 @@ class TestCoverImages:
 
         assert response.status_code == 404
 
-    def test_get_cover_remote_fetch_failure(self, app_client: TestClient, temp_db: str) -> None:
+    def test_get_cover_remote_fetch_failure(
+        self, app_client: TestClient, temp_db: str
+    ) -> None:
         from sqlmodel import Session, create_engine
+
         engine = create_engine(temp_db, connect_args={"check_same_thread": False})
 
         book_id = str(uuid4())
@@ -390,7 +402,7 @@ class TestCoverImages:
                 cover_path="http://example.com/cover.jpg",
                 file_path="/tmp/test.epub",
                 file_hash="hash",
-                file_size=100
+                file_size=100,
             )
             session.add(book)
             session.commit()
@@ -398,7 +410,10 @@ class TestCoverImages:
         mock_client = AsyncMock()
         mock_client.get.side_effect = Exception("Network error")
 
-        with patch("kobosync.http_client.HttpClientManager.get_client", return_value=mock_client):
+        with patch(
+            "kobosync.http_client.HttpClientManager.get_client",
+            return_value=mock_client,
+        ):
             response = app_client.get(f"/images/{book_id}/100/100/False/img.jpg")
             assert response.status_code == 404
             assert response.json()["detail"] == "Cover unavailable"
@@ -436,9 +451,9 @@ class TestReadingState:
     def test_get_reading_state_proxy(self, app_client: TestClient) -> None:
         mock_proxy = AsyncMock(spec=KoboProxyService)
         from fastapi import Response
+
         mock_proxy.proxy_request.return_value = Response(
-            content=b'[{"Status": "Read"}]',
-            status_code=200
+            content=b'[{"Status": "Read"}]', status_code=200
         )
 
         app_client.app.dependency_overrides[KoboProxyService] = lambda: mock_proxy
@@ -458,9 +473,9 @@ class TestReadingState:
     def test_update_reading_state_proxy(self, app_client: TestClient) -> None:
         mock_proxy = AsyncMock(spec=KoboProxyService)
         from fastapi import Response
+
         mock_proxy.proxy_request.return_value = Response(
-            content=b'{"updated": true}',
-            status_code=200
+            content=b'{"updated": true}', status_code=200
         )
 
         app_client.app.dependency_overrides[KoboProxyService] = lambda: mock_proxy
@@ -468,7 +483,7 @@ class TestReadingState:
         try:
             response = app_client.put(
                 "/api/kobo/test_token/v1/library/remote-id/state",
-                json={"ReadingStates": []}
+                json={"ReadingStates": []},
             )
 
             assert response.status_code == 200
@@ -478,8 +493,11 @@ class TestReadingState:
         finally:
             app_client.app.dependency_overrides.pop(KoboProxyService, None)
 
-    def test_update_reading_state_new_entry(self, app_client: TestClient, temp_db: str) -> None:
+    def test_update_reading_state_new_entry(
+        self, app_client: TestClient, temp_db: str
+    ) -> None:
         from sqlmodel import Session, create_engine, select
+
         engine = create_engine(temp_db, connect_args={"check_same_thread": False})
 
         book_id = str(uuid4())
@@ -490,29 +508,35 @@ class TestReadingState:
                 title="Test Book",
                 file_path="/tmp/test.epub",
                 file_hash="hash",
-                updated_at=datetime.now(UTC)
+                updated_at=datetime.now(UTC),
             )
             session.add(book)
             session.commit()
 
         payload = {
-            "ReadingStates": [{
-                 "EntitlementId": book_id,
-                 "StatusInfo": {"Status": "Reading"},
-                 "Statistics": {"SpentReadingMinutes": 10},
-                 "CurrentBookmark": {"ProgressPercent": 50, "Location": {"Value": "loc"}}
-            }]
+            "ReadingStates": [
+                {
+                    "EntitlementId": book_id,
+                    "StatusInfo": {"Status": "Reading"},
+                    "Statistics": {"SpentReadingMinutes": 10},
+                    "CurrentBookmark": {
+                        "ProgressPercent": 50,
+                        "Location": {"Value": "loc"},
+                    },
+                }
+            ]
         }
 
         response = app_client.put(
-            f"/api/kobo/test_token/v1/library/{book_id}/state",
-            json=payload
+            f"/api/kobo/test_token/v1/library/{book_id}/state", json=payload
         )
         assert response.status_code == 200
 
         # Verify DB state
         with Session(engine) as session:
-            state = session.exec(select(ReadingState).where(ReadingState.book_id == UUID(book_id))).first()
+            state = session.exec(
+                select(ReadingState).where(ReadingState.book_id == UUID(book_id))
+            ).first()
             assert state is not None
             assert state.status == "Reading"
             assert state.spent_reading_minutes == 10

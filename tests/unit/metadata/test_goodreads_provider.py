@@ -77,16 +77,19 @@ class TestGoodreadsProvider:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_rate_limit_error_raises_exception(self, provider: GoodreadsProvider) -> None:
+    async def test_rate_limit_error_raises_exception(
+        self, provider: GoodreadsProvider
+    ) -> None:
         mock_response = MagicMock()
         mock_response.status_code = 429
 
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(return_value=mock_response)
 
-        with patch.object(
-            provider, "_get_client", return_value=mock_client
-        ), pytest.raises(Exception, match="Goodreads rate limit/unavailable"):
+        with (
+            patch.object(provider, "_get_client", return_value=mock_client),
+            pytest.raises(Exception, match="Goodreads rate limit/unavailable"),
+        ):
             await provider.fetch_metadata("any query")
 
     @pytest.mark.asyncio

@@ -10,9 +10,9 @@ from kobosync.job_queue import JobQueue
 
 
 @pytest.fixture
-def start_worker() -> Generator[
-    Callable[[Settings, Engine, JobQueue], threading.Thread]
-]:
+def start_worker() -> (
+    Generator[Callable[[Settings, Engine, JobQueue], threading.Thread]]
+):
     from kobosync.worker import stop_event, worker
 
     threads = []
@@ -43,9 +43,9 @@ def start_worker() -> Generator[
 
 
 @pytest.fixture
-def async_worker_task() -> Generator[
-    Callable[[Settings, Engine, JobQueue], asyncio.Task[None]]
-]:
+def async_worker_task() -> (
+    Generator[Callable[[Settings, Engine, JobQueue], asyncio.Task[None]]]
+):
     from kobosync.worker import stop_event, worker
 
     tasks: list[asyncio.Task[None]] = []

@@ -84,7 +84,9 @@ async def watch_directories(
     logger.info(
         "Starting file watcher",
         mode=mode,
-        poll_delay_ms=settings.WATCH_POLL_DELAY_MS if settings.WATCH_FORCE_POLLING else None,
+        poll_delay_ms=settings.WATCH_POLL_DELAY_MS
+        if settings.WATCH_FORCE_POLLING
+        else None,
         directories=[str(d) for d in dirs_to_watch],
     )
 

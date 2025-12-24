@@ -105,11 +105,11 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
 
     logger.debug("Background tasks stopped")
 
-
     await HttpClientManager.close()
     logger.debug("HTTP client closed")
 
     logger.info("KoboSync shutdown complete")
+
 
 app = FastAPI(
     title="KoboSync",

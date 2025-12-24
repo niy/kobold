@@ -24,11 +24,13 @@ class GoodreadsProvider(RateLimitedProvider):
             response = await client.get(search_url)
 
             if response.status_code in (429, 503):
-                 log.warning(
+                log.warning(
                     "Goodreads rate limit or service unavailable",
                     status_code=response.status_code,
                 )
-                 raise Exception(f"Goodreads rate limit/unavailable: {response.status_code}")
+                raise Exception(
+                    f"Goodreads rate limit/unavailable: {response.status_code}"
+                )
 
             if response.status_code != 200:
                 log.warning(
@@ -52,11 +54,13 @@ class GoodreadsProvider(RateLimitedProvider):
             response = await client.get(book_url)
 
             if response.status_code in (429, 503):
-                 log.warning(
+                log.warning(
                     "Goodreads detail page rate limit or service unavailable",
                     status_code=response.status_code,
                 )
-                 raise Exception(f"Goodreads detail page rate limit/unavailable: {response.status_code}")
+                raise Exception(
+                    f"Goodreads detail page rate limit/unavailable: {response.status_code}"
+                )
 
             if response.status_code != 200:
                 log.warning(

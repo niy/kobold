@@ -158,4 +158,3 @@ class TestKepubConverter:
             result = await converter.convert(synthetic_epub, output_path)
 
         assert result is None
-

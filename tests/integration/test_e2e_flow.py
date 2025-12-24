@@ -83,7 +83,8 @@ async def test_full_pipeline_epub(
     else:
         assert dl_resp.headers["content-type"] == "application/epub+zip"
         assert (
-            len(dl_resp.content) == (test_data_dir / "romeo_and_juliet.epub").stat().st_size
+            len(dl_resp.content)
+            == (test_data_dir / "romeo_and_juliet.epub").stat().st_size
         )
 
 

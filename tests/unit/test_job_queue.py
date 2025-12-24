@@ -204,4 +204,3 @@ class TestJobQueue:
         assert stats["PENDING"] == 2
         assert stats["COMPLETED"] == 1
         assert stats["PROCESSING"] == 0
-

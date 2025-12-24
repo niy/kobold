@@ -47,7 +47,6 @@ async def worker(
     metadata_service = MetadataJobService(settings_obj, db_engine, metadata_manager)
     conversion_service = ConversionJobService(settings_obj, db_engine, converter)
 
-
     try:
         recovered = queue.recover_stale_jobs()
         if recovered:
@@ -63,7 +62,6 @@ async def worker(
             job = queue.fetch_next_job()
 
             if not job:
-
                 await asyncio.sleep(WORKER_POLL_INTERVAL)
                 continue
 
@@ -113,7 +111,6 @@ async def worker(
             break
 
         except Exception as e:
-
             if job:
                 logger.error(
                     "Job failed due to worker loop error",

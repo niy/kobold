@@ -15,7 +15,9 @@ class Settings(BaseSettings):
     # Watcher Configuration
     WATCH_DIRS: str = "/books"
     WATCH_FORCE_POLLING: bool = False
-    WATCH_POLL_DELAY_MS: int = 300  # Polling interval (only used when WATCH_FORCE_POLLING=True)
+    WATCH_POLL_DELAY_MS: int = (
+        300  # Polling interval (only used when WATCH_FORCE_POLLING=True)
+    )
 
     # Core Settings
     USER_TOKEN: str

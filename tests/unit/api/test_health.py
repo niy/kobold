@@ -32,7 +32,9 @@ def test_readiness_check_ok(mock_session_cls):
 @patch("kobosync.api.health.Session")
 def test_readiness_check_db_failure(mock_session_cls):
     # Mock the session context manager to raise an exception
-    mock_session_cls.return_value.__enter__.side_effect = Exception("DB Connection Failed")
+    mock_session_cls.return_value.__enter__.side_effect = Exception(
+        "DB Connection Failed"
+    )
 
     client = TestClient(app)
     response = client.get("/ready")

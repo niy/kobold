@@ -148,7 +148,9 @@ async def test_handle_add_restores_soft_deleted_book(
 async def test_process_job_missing_path(ingest_service):
     with (
         patch.object(ingest_service, "_handle_add", new_callable=AsyncMock) as mock_add,
-        patch.object(ingest_service, "_handle_delete", new_callable=AsyncMock) as mock_del,
+        patch.object(
+            ingest_service, "_handle_delete", new_callable=AsyncMock
+        ) as mock_del,
     ):
         await ingest_service.process_job({"event": "ADD"})  # Missing path
 
@@ -160,9 +162,13 @@ async def test_process_job_missing_path(ingest_service):
 async def test_process_job_unknown_event(ingest_service):
     with (
         patch.object(ingest_service, "_handle_add", new_callable=AsyncMock) as mock_add,
-        patch.object(ingest_service, "_handle_delete", new_callable=AsyncMock) as mock_del,
+        patch.object(
+            ingest_service, "_handle_delete", new_callable=AsyncMock
+        ) as mock_del,
     ):
-        await ingest_service.process_job({"event": "UNKNOWN", "path": "/path/to/file.epub"})
+        await ingest_service.process_job(
+            {"event": "UNKNOWN", "path": "/path/to/file.epub"}
+        )
 
         mock_add.assert_not_called()
         mock_del.assert_not_called()
@@ -201,7 +207,10 @@ async def test_handle_add_hashing_failure(ingest_service):
     with (
         patch("pathlib.Path.exists", return_value=True),
         patch("pathlib.Path.stat", return_value=Mock(st_size=1024)),
-        patch("kobosync.services.ingest.get_file_hash", side_effect=Exception("Disk error")),
+        patch(
+            "kobosync.services.ingest.get_file_hash",
+            side_effect=Exception("Disk error"),
+        ),
         pytest.raises(Exception, match="Disk error"),
     ):
         await ingest_service._handle_add(path, Mock())

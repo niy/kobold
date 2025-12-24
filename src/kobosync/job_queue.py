@@ -35,7 +35,6 @@ class JobQueue:
         deduplicate_key: str | None = None,
     ) -> Job | None:
         with Session(self.engine) as session:
-
             if deduplicate_key:
                 existing = session.exec(
                     select(Job)
@@ -51,7 +50,6 @@ class JobQueue:
                         dedupe_key=deduplicate_key,
                     )
                     return None
-
 
                 payload = {**payload, "dedupe_key": deduplicate_key}
 
@@ -76,7 +74,6 @@ class JobQueue:
         now = datetime.now(UTC)
 
         with Session(self.engine) as session:
-
             next_retry_col = col(Job.next_retry_at)
             created_at_col = col(Job.created_at)
 
@@ -97,7 +94,6 @@ class JobQueue:
             job = session.exec(statement).first()
 
             if job:
-
                 job.status = JobStatus.PROCESSING
                 job.started_at = now
                 session.add(job)
@@ -126,7 +122,6 @@ class JobQueue:
             if not job:
                 logger.warning("Attempted to complete unknown job", job_id=str(job_id))
                 return
-
 
             if status:
                 job.status = status
@@ -165,7 +160,6 @@ class JobQueue:
             job.retry_count += 1
             job.error_message = error
             job.status = JobStatus.PENDING
-
 
             if delay_seconds is None:
                 delay_seconds = 10 * (2 ** (job.retry_count - 1))

@@ -1,6 +1,6 @@
 site_name: KoboSync
 site_description: Headless Kobo library synchronization daemon.
-site_url: https://example.com/ # User should update this
+site_url: https://niy.github.io/kobosync
 repo_name: KoboSync
 repo_url: https://github.com/niy/kobosync
 edit_uri: edit/main/docs/
@@ -16,7 +16,6 @@ theme:
     - search.highlight
     - content.code.copy
   palette:
-    # Light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
       primary: indigo
@@ -24,7 +23,6 @@ theme:
       toggle:
         icon: material/weather-sunny
         name: Switch to dark mode
-    # Dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       primary: indigo

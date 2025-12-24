@@ -31,7 +31,9 @@ class TestConfigValidation:
             with pytest.raises(SystemExit) as exc:
                 get_settings()
 
-            assert "Missing required environment variable(s): KS_USER_TOKEN" in str(exc.value)
+            assert "Missing required environment variable(s): KS_USER_TOKEN" in str(
+                exc.value
+            )
 
     def test_minimal_config_succeeds(self) -> None:
         """Ensure app starts with only required variables."""

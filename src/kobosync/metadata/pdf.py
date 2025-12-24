@@ -26,12 +26,9 @@ class PdfMetadataExtractor:
         try:
             reader = PdfReader(filepath)
 
-
             self._extract_info(reader, metadata)
 
-
             self._extract_xmp(reader, metadata)
-
 
             if metadata.get("isbn"):
                 metadata["isbn"] = re.sub(
@@ -62,7 +59,6 @@ class PdfMetadataExtractor:
         if metadata.get("description"):
             pdf_metadata["/Subject"] = metadata["description"]
 
-
         keywords = []
         if metadata.get("isbn"):
             keywords.append(f"ISBN:{metadata['isbn']}")
@@ -70,7 +66,6 @@ class PdfMetadataExtractor:
             keywords.append(f"Lang:{metadata['language']}")
         if keywords:
             pdf_metadata["/Keywords"] = ", ".join(keywords)
-
 
         try:
             xmp_bytes = self._generate_xmp(metadata)
@@ -80,7 +75,6 @@ class PdfMetadataExtractor:
 
         if not pdf_metadata and not xmp_bytes:
             return
-
 
         fd, temp_path_str = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
         os.close(fd)
@@ -126,18 +120,15 @@ class PdfMetadataExtractor:
         ET.register_namespace("calibreSI", NS_CALIBRE_SI)
         ET.register_namespace("xml", NS_XML)
 
-
         xmpmeta = ET.Element("{adobe:ns:meta/}xmpmeta")
         xmpmeta.set("{adobe:ns:meta/}xmptk", "KoboSync via pypdf")
 
         rdf = ET.SubElement(xmpmeta, f"{{{NS_RDF}}}RDF")
 
-
         desc_main = ET.SubElement(rdf, f"{{{NS_RDF}}}Description")
         desc_main.set(f"{{{NS_RDF}}}about", "")
         desc_main.set(f"{{{NS_XMP}}}CreateDate", datetime.now(UTC).isoformat())
         desc_main.set(f"{{{NS_XMP}}}CreatorTool", "KoboSync")
-
 
         if metadata.get("title"):
             title_elem = ET.SubElement(desc_main, f"{{{NS_DC}}}title")
@@ -165,7 +156,6 @@ class PdfMetadataExtractor:
             li = ET.SubElement(bag, f"{{{NS_RDF}}}li")
             li.text = metadata["language"]
 
-
         identifiers = []
         if metadata.get("isbn"):
             identifiers.append(("isbn", metadata["isbn"]))
@@ -187,7 +177,6 @@ class PdfMetadataExtractor:
             val = ET.SubElement(li, f"{{{NS_RDF}}}value")
             val.text = value
 
-
         if metadata.get("series"):
             desc_cal = ET.SubElement(rdf, f"{{{NS_RDF}}}Description")
             desc_cal.set(f"{{{NS_RDF}}}about", "")
@@ -205,10 +194,7 @@ class PdfMetadataExtractor:
                 )
                 idx_elem.text = f"{metadata['series_index']:.2f}"
 
-
-
         xml_str = ET.tostring(xmpmeta, encoding="utf-8")
-
 
         start = b'<?xpacket begin="\xef\xbb\xbf" id="W5M0MpCehiHzreSzNTczkc9d"?>'
         end = b'<?xpacket end="w"?>'

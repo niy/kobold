@@ -52,7 +52,6 @@ class MetadataJobService:
             )
             log.info("Fetching metadata")
 
-
             metadata = await self.metadata_manager.get_metadata(
                 title=book.title,
                 author=book.author,
@@ -63,7 +62,6 @@ class MetadataJobService:
             if not metadata:
                 log.info("No metadata found")
                 return
-
 
             updated_fields = []
             for field, value in metadata.items():
@@ -83,9 +81,7 @@ class MetadataJobService:
                     new_title=book.title,
                 )
 
-
                 if self.settings.EMBED_METADATA:
-
                     cover_path = metadata.get("cover_path")
                     if cover_path and cover_path.startswith("http"):
                         try:

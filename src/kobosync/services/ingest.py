@@ -76,11 +76,9 @@ class IngestService:
             log.debug("File no longer exists, skipping")
             return
 
-
         if filepath.suffix.lower() not in SUPPORTED_EXTENSIONS:
             log.debug("Unsupported file extension", extension=filepath.suffix)
             return
-
 
         file_size = filepath.stat().st_size
 
@@ -99,7 +97,6 @@ class IngestService:
             ).first()
 
             if existing_book:
-
                 if existing_book.file_path != str(filepath):
                     existing_book.file_path = str(filepath)
                     existing_book.is_deleted = False
@@ -116,13 +113,11 @@ class IngestService:
                     log.debug("Book already exists with same path")
                 return
 
-
             existing_book_by_path = session.exec(
                 select(Book).where(Book.file_path == str(filepath))
             ).first()
 
             if existing_book_by_path:
-
                 existing_book_by_path.file_hash = file_hash
                 existing_book_by_path.file_size = filepath.stat().st_size
                 existing_book_by_path.is_deleted = False
@@ -138,7 +133,6 @@ class IngestService:
                     new_hash=file_hash[:12],
                 )
                 return
-
 
             file_stat = filepath.stat()
             new_book = Book(
@@ -160,12 +154,10 @@ class IngestService:
                 file_hash=file_hash[:12],
             )
 
-
             self.job_queue.add_job(
                 JobType.METADATA,
                 payload={"book_id": str(new_book.id)},
             )
-
 
             is_epub = filepath.suffix.lower() == ".epub"
             is_already_kepub = filepath.stem.lower().endswith(".kepub")

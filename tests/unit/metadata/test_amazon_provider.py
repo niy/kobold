@@ -77,20 +77,25 @@ class TestAmazonProvider:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_rate_limit_error_raises_exception(self, provider: AmazonProvider) -> None:
+    async def test_rate_limit_error_raises_exception(
+        self, provider: AmazonProvider
+    ) -> None:
         mock_response = MagicMock()
         mock_response.status_code = 503
 
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(return_value=mock_response)
 
-        with patch.object(
-            provider, "_get_client", return_value=mock_client
-        ), pytest.raises(Exception, match="Amazon rate limit/unavailable"):
+        with (
+            patch.object(provider, "_get_client", return_value=mock_client),
+            pytest.raises(Exception, match="Amazon rate limit/unavailable"),
+        ):
             await provider.fetch_metadata("any query")
 
     @pytest.mark.asyncio
-    async def test_generic_http_error_returns_none(self, provider: AmazonProvider) -> None:
+    async def test_generic_http_error_returns_none(
+        self, provider: AmazonProvider
+    ) -> None:
         mock_response = MagicMock()
         mock_response.status_code = 500
 

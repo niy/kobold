@@ -33,7 +33,9 @@ def configure_logging(level: str = "INFO") -> None:
     )
 
 
-def get_logger(name: str | None = None, **initial_context: Any) -> structlog.stdlib.BoundLogger:
+def get_logger(
+    name: str | None = None, **initial_context: Any
+) -> structlog.stdlib.BoundLogger:
     logger = structlog.get_logger(name)
     if initial_context:
         logger = logger.bind(**initial_context)

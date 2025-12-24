@@ -139,7 +139,6 @@ async def test_process_job_already_converted(
     mock_converter.convert.assert_not_called()
 
 
-
 @pytest.mark.asyncio
 async def test_process_job_source_file_not_found(
     conversion_service, mock_session, mock_engine

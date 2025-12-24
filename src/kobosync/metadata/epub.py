@@ -65,16 +65,13 @@ class EpubMetadataExtractor:
                     temp_path, "w", compression=zipfile.ZIP_DEFLATED
                 ) as zf_out,
             ):
-
                 opf_path = self._find_opf_path(zf_in)
                 if not opf_path:
                     raise ValueError("Could not find OPF file in EPUB")
 
-
                 cover_href = None
                 if metadata.get("cover_data"):
                     cover_href = self._find_cover_href(zf_in, opf_path)
-
 
                 for item in zf_in.infolist():
                     if item.filename == opf_path:

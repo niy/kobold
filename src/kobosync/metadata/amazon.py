@@ -49,7 +49,6 @@ class AmazonProvider(RateLimitedProvider):
         self._headers = self._build_headers()
         self._cookie_configured = bool(self._settings.AMAZON_COOKIE)
 
-
         log = logger.bind(
             domain=self._settings.AMAZON_DOMAIN,
             base_url=self._base_url,
@@ -97,11 +96,13 @@ class AmazonProvider(RateLimitedProvider):
             response = await client.get(search_url, headers=self._headers)
 
             if response.status_code in (429, 503):
-                 log.warning(
+                log.warning(
                     "Amazon rate limit or service unavailable",
                     status_code=response.status_code,
                 )
-                 raise Exception(f"Amazon rate limit/unavailable: {response.status_code}")
+                raise Exception(
+                    f"Amazon rate limit/unavailable: {response.status_code}"
+                )
 
             if response.status_code != 200:
                 log.warning(
@@ -109,7 +110,6 @@ class AmazonProvider(RateLimitedProvider):
                     status_code=response.status_code,
                 )
                 return None
-
 
             if self._is_auth_error(response.text):
                 if self._cookie_configured:
@@ -132,7 +132,6 @@ class AmazonProvider(RateLimitedProvider):
                 log.debug("No book found in search results")
                 return None
 
-
             if not book_url.startswith("http"):
                 book_url = self._base_url + book_url
 
@@ -141,11 +140,13 @@ class AmazonProvider(RateLimitedProvider):
             response = await client.get(book_url, headers=self._headers)
 
             if response.status_code in (429, 503):
-                 log.warning(
+                log.warning(
                     "Amazon detail page rate limit or service unavailable",
                     status_code=response.status_code,
                 )
-                 raise Exception(f"Amazon detail page rate limit/unavailable: {response.status_code}")
+                raise Exception(
+                    f"Amazon detail page rate limit/unavailable: {response.status_code}"
+                )
 
             if response.status_code != 200:
                 log.warning(
@@ -153,7 +154,6 @@ class AmazonProvider(RateLimitedProvider):
                     status_code=response.status_code,
                 )
                 return None
-
 
             if self._is_auth_error(response.text):
                 if self._cookie_configured:
@@ -209,7 +209,6 @@ class AmazonProvider(RateLimitedProvider):
                     return element.get_text().strip()
             return None
 
-
         title = get_text(
             "#productTitle",
             "#ebooksProductTitle",
@@ -219,7 +218,6 @@ class AmazonProvider(RateLimitedProvider):
         if title:
             metadata["title"] = title
 
-
         author_elements = soup.select("#bylineInfo_feature_div .author a")
         if not author_elements:
             author_elements = soup.select("#bylineInfo .author a")
@@ -227,13 +225,11 @@ class AmazonProvider(RateLimitedProvider):
         if author_elements:
             metadata["author"] = author_elements[0].get_text().strip()
 
-
         desc_element = soup.select_one(
             '[data-a-expander-name="book_description_expander"] .a-expander-content'
         )
         if desc_element:
             metadata["description"] = desc_element.decode_contents()
-
 
         series_element = soup.select_one(
             "#rpi-attribute-book_details-series .rpi-attribute-value a span"
@@ -246,7 +242,6 @@ class AmazonProvider(RateLimitedProvider):
             if match:
                 metadata["series_index"] = float(match.group(1))
 
-
         rating_element = soup.select_one(
             "#averageCustomerReviews_feature_div span#acrPopover"
         )
@@ -255,7 +250,6 @@ class AmazonProvider(RateLimitedProvider):
             match = re.search(r"([\d.]+)", rating_text)
             if match:
                 metadata["rating"] = float(match.group(1))
-
 
         img_element = soup.select_one("#landingImage")
         if img_element:

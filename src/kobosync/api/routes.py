@@ -165,9 +165,7 @@ async def sync_library(
     # Fetch Kobo store entitlements
     resp_headers: dict[str, str] = {}
 
-    kobo_status, kobo_headers, kobo_ents = await proxy_service.fetch_kobo_sync(
-        request
-    )
+    kobo_status, kobo_headers, kobo_ents = await proxy_service.fetch_kobo_sync(request)
 
     if kobo_status == 200:
         entitlements.extend(kobo_ents)

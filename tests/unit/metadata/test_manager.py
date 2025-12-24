@@ -147,9 +147,21 @@ class TestMetadataManager:
         amazon_metadata = {"title": "External Title"}
 
         with (
-            patch.object(manager, "_extract_internal_metadata", return_value=internal_meta),
-            patch.object(manager._amazon, "fetch_metadata", new_callable=AsyncMock, return_value=amazon_metadata),
-            patch.object(manager._goodreads, "fetch_metadata", new_callable=AsyncMock, return_value=None),
+            patch.object(
+                manager, "_extract_internal_metadata", return_value=internal_meta
+            ),
+            patch.object(
+                manager._amazon,
+                "fetch_metadata",
+                new_callable=AsyncMock,
+                return_value=amazon_metadata,
+            ),
+            patch.object(
+                manager._goodreads,
+                "fetch_metadata",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
         ):
             result = await manager.get_metadata(
                 title="Ignored",
@@ -169,9 +181,15 @@ class TestMetadataManager:
 
         with (
             patch.object(manager, "_extract_internal_metadata", return_value={}),
-            patch.object(manager._amazon, "fetch_metadata", new_callable=AsyncMock, return_value=bad_metadata),
+            patch.object(
+                manager._amazon,
+                "fetch_metadata",
+                new_callable=AsyncMock,
+                return_value=bad_metadata,
+            ),
         ):
-            result = await manager.get_metadata(title="Test", filepath=str(synthetic_epub))
+            result = await manager.get_metadata(
+                title="Test", filepath=str(synthetic_epub)
+            )
 
         assert result["title"] == 12345
-
