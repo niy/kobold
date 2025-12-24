@@ -18,6 +18,10 @@ dependencies = [
     "xxhash>=3.6.0",
 ]
 
+[project.urls]
+Documentation = "https://niy.github.io/kobosync/"
+Source = "https://github.com/niy/kobosync"
+
 [dependency-groups]
 dev = [
     "mkdocs>=1.6.1",

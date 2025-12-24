@@ -2,6 +2,8 @@
 
 KoboSync is a lightweight service that synchronizes a local eBook collection with Kobo eReaders. It automates file ingestion, enriches content with metadata, and serves books via the Kobo Sync API.
 
+**[Documentation](https://niy.github.io/kobosync/)**
+
 ## Features
 
 *   **Lightweight**: Minimal resource footprint. It has no UI, no external dependencies, and runs as a single process.
