@@ -1,4 +1,4 @@
-FROM python:3.13-alpine AS builder
+FROM python:3.14-alpine AS builder
 
 RUN apk add --no-cache build-base libffi-dev curl
 
@@ -25,7 +25,7 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
     chmod +x /kepubify
 
 # Runtime Stage
-FROM python:3.13-alpine
+FROM python:3.14-alpine
 
 RUN apk add --no-cache libffi
 
