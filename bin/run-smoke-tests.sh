@@ -79,6 +79,9 @@ until curl -s http://localhost:8000/health > /dev/null; do
 done
 echo -e "${GREEN}Service is up!${NC}"
 
+echo "Installing test dependencies..."
+uv sync --frozen --all-extras --dev
+
 echo "Running pytest..."
 export KS_USER_TOKEN=${TOKEN}
 export KS_TEST_URL="http://localhost:8000"
