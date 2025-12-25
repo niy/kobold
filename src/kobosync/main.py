@@ -1,15 +1,3 @@
-"""
-KoboSync main entry point.
-
-Initializes and runs the daemon with three concurrent components:
-1. FastAPI server for Kobo device communication
-2. File watcher for directory monitoring
-3. Background worker for job processing
-
-The application is designed for 24/7 operation with graceful shutdown
-and self-healing capabilities.
-"""
-
 import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
