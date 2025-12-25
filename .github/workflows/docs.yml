@@ -32,6 +32,7 @@ jobs:
         with:
           enable-cache: true
           cache-suffix: "mkdocs-material"
+          cache-dependency-glob: "uv.lock"
 
       - name: Set up Python
         uses: actions/setup-python@v6
