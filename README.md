@@ -41,7 +41,7 @@ The recommended way to deploy is via Docker Compose.
           - ./data:/data
           - /path/to/my/books:/books
         environment:
-          - KS_USER_TOKEN=your_generated_token
+          - KB_USER_TOKEN=your_generated_token
     ```
 
 3.  Start the service:
@@ -54,7 +54,7 @@ The recommended way to deploy is via Docker Compose.
 
 Kobold is configured using environment variables.
 
-The only required environment variable is `KS_USER_TOKEN`, which is used for authentication. You can use `openssl rand -hex 16` or any other method you prefer (e.g. a password manager) to generate a cryptographically secure random string.
+The only required environment variable is `KB_USER_TOKEN`, which is used for authentication. You can use `openssl rand -hex 16` or any other method you prefer (e.g. a password manager) to generate a cryptographically secure random string.
 
 For a list of available options, refer to the [Configuration Documentation](docs/configuration.md).
 
@@ -68,7 +68,7 @@ To synchronize a Kobo device, edit the `Kobo eReader.conf` file on the device to
 
     ```ini
     [OneStoreServices]
-    api_endpoint=http://<SERVER_IP>:8000/api/kobo/<KS_USER_TOKEN>
+    api_endpoint=http://<SERVER_IP>:8000/api/kobo/<KB_USER_TOKEN>
     ```
 
 For detailed instructions, refer to the [Device Setup Guide](docs/device_setup.md).

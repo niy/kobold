@@ -101,6 +101,6 @@ jobs:
 
       - name: Run Tests
         env:
-          KS_USER_TOKEN: "dummy_token"
-          KS_FETCH_EXTERNAL_METADATA: false
+          KB_USER_TOKEN: "dummy_token"
+          KB_FETCH_EXTERNAL_METADATA: false
         run: uv run pytest --basetemp=.tmp/pytest_temp

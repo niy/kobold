@@ -36,7 +36,7 @@ services:
         - ./data:/data
         - /path/to/books:/books
       environment:
-        - KS_USER_TOKEN=__YOUR_TOKEN_HERE__
+        - KB_USER_TOKEN=__YOUR_TOKEN_HERE__
 ```
 
 #### 3. Start Service
@@ -70,8 +70,8 @@ Update your `docker-compose.yml`:
 
 ```yaml
 environment:
-  - KS_WATCH_FORCE_POLLING=True
-  - KS_WATCH_POLL_DELAY_MS=500
+  - KB_WATCH_FORCE_POLLING=True
+  - KB_WATCH_POLL_DELAY_MS=500
 ```
 
 ### Container Fails to Start
@@ -85,4 +85,4 @@ docker compose logs -f
 Common issues include:
 
 *   Port `8000` is already in use.
-*   `KS_USER_TOKEN` is missing (it is required for startup).
+*   `KB_USER_TOKEN` is missing (it is required for startup).

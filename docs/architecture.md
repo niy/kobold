@@ -28,7 +28,7 @@ If configured, `.epub` files are converted to `.kepub.epub` using `kepubify`. Th
 
 ### 4. Synchronization
 When a device initiates a sync:
-1.  **Authentication**: The device authenticates using the `KS_USER_TOKEN`.
+1.  **Authentication**: The device authenticates using the `KB_USER_TOKEN`.
 2.  **Entitlement Sync**: The server compares the device's `SyncToken` with the library state.
 3.  **Delivery**: New or updated books are sent to the device. Optimized KEPUB files are served if available.
 

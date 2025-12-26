@@ -12,7 +12,7 @@ To synchronize a Kobo eReader with Kobold, the device's configuration file must 
 
     ```ini
     [OneStoreServices]
-    api_endpoint=http://<SERVER_IP>:<PORT>/api/kobo/<KS_USER_TOKEN>
+    api_endpoint=http://<SERVER_IP>:<PORT>/api/kobo/<KB_USER_TOKEN>
     ```
 
     *Example*:

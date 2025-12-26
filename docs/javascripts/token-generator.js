@@ -14,10 +14,10 @@
     };
 
     const updateDockerCompose = (token) => {
-        const searchPattern = 'KS_USER_TOKEN=__YOUR_TOKEN_HERE__';
+        const searchPattern = 'KB_USER_TOKEN=__YOUR_TOKEN_HERE__';
         document.querySelectorAll('code').forEach(code => {
             if (code.textContent.includes(searchPattern)) {
-                code.innerHTML = code.innerHTML.replace(searchPattern, 'KS_USER_TOKEN=' + token);
+                code.innerHTML = code.innerHTML.replace(searchPattern, 'KB_USER_TOKEN=' + token);
             }
         });
     };

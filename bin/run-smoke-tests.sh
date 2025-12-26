@@ -2,7 +2,7 @@
 set -e
 
 TEST_DIR=".tmp/smoke_tests"
-BOOKS_DIR="${TEST_DIR}/books"
+BOOKB_DIR="${TEST_DIR}/books"
 DATA_DIR="${TEST_DIR}/data"
 TOKEN="smoke_test_token"
 
@@ -38,7 +38,7 @@ fi
 
 echo "Setting up test directories in ${TEST_DIR}..."
 rm -rf "${TEST_DIR}"
-mkdir -p "${BOOKS_DIR}"
+mkdir -p "${BOOKB_DIR}"
 mkdir -p "${DATA_DIR}"
 
 if [ "$(docker ps -aq -f name=${CONTAINER_NAME})" ]; then
@@ -53,7 +53,7 @@ docker run -d --name ${CONTAINER_NAME} \
   -e KB_USER_TOKEN=${TOKEN} \
   -e KB_WORKER_POLL_INTERVAL=0.1 \
   -e KB_FETCH_EXTERNAL_METADATA=${WITH_METADATA:-false} \
-  -v "$(pwd)/${BOOKS_DIR}:/books" \
+  -v "$(pwd)/${BOOKB_DIR}:/books" \
   -v "$(pwd)/${DATA_DIR}:/data" \
   ${IMAGE_NAME}
 
@@ -85,7 +85,7 @@ uv sync --frozen --all-extras --dev
 echo "Running pytest..."
 export KB_USER_TOKEN=${TOKEN}
 export KB_TEST_URL="http://localhost:8000"
-export KB_TEST_BOOKS_DIR="${BOOKS_DIR}"
+export KB_TEST_BOOKB_DIR="${BOOKB_DIR}"
 
 export KB_TEST_FETCH_METADATA=${WITH_METADATA:-false}
 
