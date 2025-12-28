@@ -27,6 +27,8 @@ def synthetic_epub(tmp_path: Path) -> Path:
         <dc:creator>Test Author</dc:creator>
         <dc:identifier id="uid">urn:isbn:9780123456789</dc:identifier>
         <dc:language>en</dc:language>
+        <dc:subject>Fiction</dc:subject>
+        <dc:subject>Drama</dc:subject>
         <meta name="calibre:series" content="Test Series"/>
         <meta name="calibre:series_index" content="1"/>
     </metadata>

@@ -234,6 +234,12 @@ class EpubMetadataExtractor:
             if language is not None and language.text:
                 metadata["language"] = language.text.strip()
 
+            subjects = metadata_elem.findall("dc:subject", self.NAMESPACES)
+            for subject in subjects:
+                if subject.text and subject.text.strip():
+                    metadata["genre"] = subject.text.strip()
+                    break
+
             isbn = self._extract_isbn(metadata_elem)
             if isbn:
                 metadata["isbn"] = isbn

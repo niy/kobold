@@ -8,9 +8,11 @@ from .conversion import KepubConverter
 from .logging_config import get_logger
 from .metadata.manager import MetadataManager
 from .models import JobStatus, JobType
+from .organizer import LibraryOrganizer
 from .services.conversion_service import ConversionJobService
 from .services.ingest import IngestService
 from .services.metadata_service import MetadataJobService
+from .services.organization_service import OrganizationJobService
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
@@ -42,8 +44,12 @@ async def worker(
     converter = KepubConverter()
 
     ingest_service = IngestService(settings_obj, db_engine, queue)
-    metadata_service = MetadataJobService(settings_obj, db_engine, metadata_manager)
+    metadata_service = MetadataJobService(
+        settings_obj, db_engine, metadata_manager, queue
+    )
     conversion_service = ConversionJobService(settings_obj, db_engine, converter)
+    organizer = LibraryOrganizer(settings_obj)
+    organization_service = OrganizationJobService(settings_obj, db_engine, organizer)
 
     try:
         recovered = queue.recover_stale_jobs()
@@ -76,6 +82,8 @@ async def worker(
                         await ingest_service.process_job(job.payload)
                     case JobType.METADATA:
                         await metadata_service.process_job(job.payload)
+                    case JobType.ORGANIZE:
+                        await organization_service.process_job(job.payload)
                     case JobType.CONVERT:
                         await conversion_service.process_job(job.payload)
                     case _:

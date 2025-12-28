@@ -7,12 +7,13 @@ from sqlmodel import Session
 
 from ..http_client import HttpClientManager
 from ..logging_config import get_logger
-from ..models import Book
+from ..models import Book, JobType
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
 
     from ..config import Settings
+    from ..job_queue import JobQueue
     from ..metadata.manager import MetadataManager
 
 logger = get_logger(__name__)
@@ -24,10 +25,12 @@ class MetadataJobService:
         settings_obj: Settings,
         db_engine: Engine,
         manager: MetadataManager,
+        queue: JobQueue,
     ):
         self.settings = settings_obj
         self.engine = db_engine
         self.metadata_manager = manager
+        self.job_queue = queue
 
     async def process_job(self, payload: dict[str, Any]) -> None:
         book_id_str = payload.get("book_id")
@@ -55,7 +58,7 @@ class MetadataJobService:
             metadata = await self.metadata_manager.get_metadata(
                 title=book.title,
                 author=book.author,
-                isbn=book.isbn13 or book.isbn10 or book.isbn,
+                isbn=book.isbn,
                 filepath=book.file_path,
             )
 
@@ -103,6 +106,13 @@ class MetadataJobService:
                             log.warning("Error downloading cover image", error=str(e))
 
                     self.metadata_manager.embed_metadata(book.file_path, metadata)
+
+                if self.settings.ORGANIZE_LIBRARY:
+                    log.info("Queueing organization job")
+                    self.job_queue.add_job(
+                        JobType.ORGANIZE,
+                        payload={"book_id": str(book.id)},
+                    )
 
             else:
                 log.debug("No new metadata to update")

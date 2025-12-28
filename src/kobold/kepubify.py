@@ -45,23 +45,15 @@ class KepubifyBinary:
                 )
                 return "kepubify-linux-64bit"
 
-    def resolve(self) -> str | None:
-        """
-        Find kepubify in PATH or local bin directory.
-
-        Returns:
-            Path to binary if found, None otherwise
-        """
+    def _find_existing(self) -> str | None:
         system_binary = shutil.which("kepubify")
         if system_binary:
             logger.debug("Using system kepubify", path=system_binary)
             return system_binary
 
-        self.bin_dir.mkdir(exist_ok=True)
         local_binary = self.bin_dir / self._get_platform_binary_name()
 
         if local_binary.exists():
-            local_binary.chmod(0o755)
             logger.debug("Using local kepubify", path=str(local_binary))
             return str(local_binary)
 
@@ -80,7 +72,7 @@ class KepubifyBinary:
         if self._cached_path and Path(self._cached_path).exists():
             return self._cached_path
 
-        resolved = self.resolve()
+        resolved = self._find_existing()
         if resolved:
             self._cached_path = resolved
             return resolved
@@ -96,11 +88,11 @@ class KepubifyBinary:
             response = await client.get(download_url)
             response.raise_for_status()
 
-            self.bin_dir.mkdir(exist_ok=True)
+            self.bin_dir.mkdir(parents=True, exist_ok=True)
             local_path = self.bin_dir / binary_name
 
             await asyncio.to_thread(local_path.write_bytes, response.content)
-            await asyncio.to_thread(local_path.chmod, 0o755)
+            local_path.chmod(0o755)
 
             self._cached_path = str(local_path)
             log.info("Kepubify downloaded successfully", path=str(local_path))

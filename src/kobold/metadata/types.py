@@ -13,5 +13,6 @@ class BookMetadata(TypedDict, total=False):
     isbn: str
     language: str
     publisher: str
+    genre: str
     amazon_id: str
     goodreads_id: str

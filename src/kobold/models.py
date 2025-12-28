@@ -22,6 +22,7 @@ class JobType(str, Enum):
     INGEST = "INGEST"
     CONVERT = "CONVERT"
     METADATA = "METADATA"
+    ORGANIZE = "ORGANIZE"
 
 
 class Job(SQLModel, table=True):
@@ -63,8 +64,7 @@ class BookBase(SQLModel):
     rating: float | None = None
     review_count: int | None = None
     publication_date: datetime | None = None
-    isbn10: str | None = Field(default=None, index=True)
-    isbn13: str | None = Field(default=None, index=True)
+    genre: str | None = Field(default=None, index=True)
 
     file_path: str = Field(unique=True, index=True)
     kepub_path: str | None = None

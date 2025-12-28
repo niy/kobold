@@ -98,17 +98,40 @@ class IngestService:
 
             if existing_book:
                 if existing_book.file_path != str(filepath):
-                    existing_book.file_path = str(filepath)
-                    existing_book.is_deleted = False
-                    existing_book.deleted_at = None
-                    existing_book.mark_updated()
-                    session.add(existing_book)
-                    session.commit()
-                    log.info(
-                        "Updated path for existing book",
-                        book_id=str(existing_book.id),
-                        title=existing_book.title,
-                    )
+                    original_path = Path(existing_book.file_path)
+
+                    if original_path.exists():
+                        # Delete new file if it's a duplicate
+                        try:
+                            filepath.unlink()
+                            log.info(
+                                "Deleted duplicate file",
+                                original_path=str(original_path),
+                                duplicate_path=str(filepath),
+                            )
+                        except OSError as e:
+                            log.error("Failed to delete duplicate file", error=str(e))
+                        return
+
+                    else:
+                        # Heal broken link
+                        log.info(
+                            "Original file missing, healing link",
+                            old_path=str(original_path),
+                            new_path=str(filepath),
+                        )
+                        existing_book.file_path = str(filepath)
+                        existing_book.is_deleted = False
+                        existing_book.deleted_at = None
+                        existing_book.mark_updated()
+                        session.add(existing_book)
+                        session.commit()
+
+                        # Trigger Organization to move it to correct location
+                        self.job_queue.add_job(
+                            JobType.ORGANIZE,
+                            payload={"book_id": str(existing_book.id)},
+                        )
                 else:
                     log.debug("Book already exists with same path")
                 return

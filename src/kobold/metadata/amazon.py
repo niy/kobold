@@ -268,4 +268,14 @@ class AmazonProvider(RateLimitedProvider):
                 if src:
                     metadata["cover_path"] = src
 
+        breadcrumbs = tree.css("#wayfinding-breadcrumbs_feature_div .a-list-item a")
+        if breadcrumbs:
+            genres = [
+                b.text().strip()
+                for b in breadcrumbs
+                if b.text() and b.text().strip() not in ("Books", "Kindle Store")
+            ]
+            if genres:
+                metadata["genre"] = genres[0]
+
         return metadata

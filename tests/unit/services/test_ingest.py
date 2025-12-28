@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import pytest
 from sqlmodel import Session
 
-from kobold.models import Book
+from kobold.models import Book, JobType
 from kobold.services.ingest import IngestService
 
 
@@ -50,7 +50,6 @@ async def test_process_job_dispatch(ingest_service):
         mock_add.reset_mock()
         mock_del.reset_mock()
 
-        # Test DELETE
         await ingest_service.process_job(
             {"event": "DELETE", "path": "/path/to/file.epub"}
         )
@@ -76,14 +75,12 @@ async def test_handle_add_new_file(
     ):
         await ingest_service._handle_add(path, Mock())
 
-        # Verify book created on the session instance
         mock_session_instance.add.assert_called()
         args = mock_session_instance.add.call_args[0]
         assert isinstance(args[0], Book)
         assert args[0].title == "new_book"
         assert args[0].file_hash == "hash123"
 
-        # Verify jobs queued
         assert mock_job_queue.add_job.call_count >= 1
 
 
@@ -136,7 +133,6 @@ async def test_handle_add_restores_soft_deleted_book(
     ):
         await ingest_service._handle_add(path, Mock())
 
-        # Verify book was restored
         assert mock_deleted_book.is_deleted is False
         assert mock_deleted_book.deleted_at is None
         mock_deleted_book.mark_updated.assert_called_once()
@@ -238,5 +234,94 @@ async def test_handle_add_idempotency(ingest_service, mock_session):
     ):
         await ingest_service._handle_add(path, Mock())
 
-        # Should catch "Book already exists" path
         mock_session_instance.commit.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_handle_add_duplicate_file_deleted(ingest_service, mock_session):
+    """Test Scenario A: Duplicate file deleted if original exists."""
+    new_path = Path("/books/duplicate.epub")
+    original_str = "/books/original.epub"
+
+    mock_book = Mock(spec=Book)
+    mock_book.id = "123"
+    mock_book.file_path = original_str
+    mock_book.title = "Original Book"
+
+    mock_session_instance = MagicMock(spec=Session)
+    mock_session.return_value.__enter__.return_value = mock_session_instance
+    mock_session_instance.exec.return_value.first.return_value = mock_book
+
+    def exists_side_effect(self):
+        # Original file exists
+        if str(self) == original_str:
+            return True
+        # New file exists (initially)
+        return str(self) == str(new_path)
+
+    with (
+        patch("kobold.services.ingest.Session", mock_session),
+        patch(
+            "pathlib.Path.exists",
+            start_new_session=True,
+            autospec=True,
+            side_effect=exists_side_effect,
+        ),
+        patch("pathlib.Path.stat", return_value=Mock(st_size=1024)),
+        patch("pathlib.Path.unlink") as mock_unlink,
+        patch("kobold.services.ingest.get_file_hash", return_value="hash123"),
+    ):
+        await ingest_service._handle_add(new_path, Mock())
+
+        mock_unlink.assert_called_once()
+        mock_session_instance.commit.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_handle_add_self_healing(ingest_service, mock_session, mock_job_queue):
+    """Test Scenario B: Self-healing if original file is missing."""
+    new_path = Path("/books/restored.epub")
+    original_str = "/books/missing_original.epub"
+
+    mock_book = Mock(spec=Book)
+    mock_book.id = "123"
+    mock_book.file_path = original_str
+    mock_book.title = "Broken Link Book"
+    mock_book.is_deleted = False
+
+    mock_session_instance = MagicMock(spec=Session)
+    mock_session.return_value.__enter__.return_value = mock_session_instance
+    mock_session_instance.exec.return_value.first.return_value = mock_book
+
+    def exists_side_effect(self):
+        # Original file MISSING
+        if str(self) == original_str:
+            return False
+        # New file exists
+        # New file exists
+        return str(self) == str(new_path)
+
+    with (
+        patch("kobold.services.ingest.Session", mock_session),
+        patch(
+            "pathlib.Path.exists",
+            start_new_session=True,
+            autospec=True,
+            side_effect=exists_side_effect,
+        ),
+        patch("pathlib.Path.stat", return_value=Mock(st_size=1024)),
+        patch("pathlib.Path.unlink") as mock_unlink,
+        patch("kobold.services.ingest.get_file_hash", return_value="hash123"),
+    ):
+        await ingest_service._handle_add(new_path, Mock())
+
+        mock_unlink.assert_not_called()
+
+        assert mock_book.file_path == str(new_path)
+        mock_session_instance.add.assert_called_with(mock_book)
+        mock_session_instance.commit.assert_called_once()
+
+        mock_job_queue.add_job.assert_called_with(
+            JobType.ORGANIZE,
+            payload={"book_id": str(mock_book.id)},
+        )

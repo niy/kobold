@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     EMBED_METADATA: bool = False
     FETCH_EXTERNAL_METADATA: bool = True
 
+    # Library Organization
+    ORGANIZE_LIBRARY: bool = False
+    ORGANIZE_TEMPLATE: str = "{author}/{title}"
+
     # Data Directory
     DATA_PATH: Path = Field(default_factory=lambda: PROJECT_ROOT / "data")
 

@@ -29,6 +29,7 @@ Kobold is a lightweight service that synchronizes a local eBook collection with 
 *   **Automatic Ingestion**: Detects and processes new files immediately upon addition to watched directories.
 *   **Metadata Enrichment**: Retrieves high-resolution covers, series information, and ISBNs from Amazon and Goodreads.
 *   **Automatic Conversion**: Optionally converts `.epub` files to optimized `.kepub.epub` format.
+*   **Library Organization**: Automatically organizes books into a custom folder structure based on metadata (e.g., Author/Series/Title).
 
 ## Getting Started
 

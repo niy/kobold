@@ -141,4 +141,13 @@ class GoodreadsProvider(RateLimitedProvider):
             if src:
                 metadata["cover_path"] = src
 
+        genre_element = tree.css_first('div[data-testid="genresList"] a')
+        if not genre_element:
+            genre_element = tree.css_first(".bookPageGenreLink")
+
+        if genre_element:
+            text = genre_element.text()
+            if text:
+                metadata["genre"] = text.strip()
+
         return metadata
