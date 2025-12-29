@@ -19,7 +19,6 @@ from kobold.watcher import watch_directories
 async def hooks_ctx(
     tmp_path: Path,
     mock_amazon_provider: AsyncMock,
-    mock_kepub_converter: AsyncMock,
 ):
     from kobold.task_queue import TaskQueue
 

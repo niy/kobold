@@ -43,9 +43,9 @@ def mock_goodreads_provider() -> Generator[AsyncMock]:
         yield mock
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mock_kepub_converter() -> Generator[AsyncMock]:
-    with patch("kobold.conversion.KepubConverter") as MockConverterCls:
+    with patch("kobold.task_registry.KepubConverter") as MockConverterCls:
         mock = MockConverterCls.return_value
 
         async def mock_convert_impl(input_path: Path, output_path: Path) -> Path | None:
