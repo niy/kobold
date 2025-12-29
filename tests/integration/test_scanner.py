@@ -28,7 +28,7 @@ class TestScanner:
         service = ScannerService(mock_settings, mock_queue)
         await service.scan_directories()
 
-        assert mock_queue.add_job.call_count == 2
+        assert mock_queue.add_task.call_count == 2
 
     @pytest.mark.asyncio
     async def test_scan_discovers_all_supported_extensions(
@@ -49,7 +49,7 @@ class TestScanner:
         service = ScannerService(mock_settings, mock_queue)
         await service.scan_directories()
 
-        assert mock_queue.add_job.call_count == 5
+        assert mock_queue.add_task.call_count == 5
 
     @pytest.mark.asyncio
     async def test_scan_ignores_unsupported_files(self, tmp_path: Path) -> None:
@@ -65,7 +65,7 @@ class TestScanner:
         service = ScannerService(mock_settings, mock_queue)
         await service.scan_directories()
 
-        mock_queue.add_job.assert_not_called()
+        mock_queue.add_task.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_scan_recursive_subdirectories(self, tmp_path: Path) -> None:
@@ -82,7 +82,7 @@ class TestScanner:
         service = ScannerService(mock_settings, mock_queue)
         await service.scan_directories()
 
-        assert mock_queue.add_job.call_count == 2
+        assert mock_queue.add_task.call_count == 2
 
     @pytest.mark.asyncio
     async def test_scan_handles_missing_directory(self, tmp_path: Path) -> None:
@@ -96,7 +96,7 @@ class TestScanner:
         service = ScannerService(mock_settings, mock_queue)
         await service.scan_directories()
 
-        mock_queue.add_job.assert_not_called()
+        mock_queue.add_task.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_scan_multiple_directories(self, tmp_path: Path) -> None:
@@ -116,4 +116,4 @@ class TestScanner:
         service = ScannerService(mock_settings, mock_queue)
         await service.scan_directories()
 
-        assert mock_queue.add_job.call_count == 2
+        assert mock_queue.add_task.call_count == 2

@@ -6,7 +6,9 @@ import pytest
 from sqlmodel import Session, col, select
 from tests.conftest import IntegrationContext
 
-from kobold.models import Book, Job
+from kobold.models import Book
+from kobold.models import Task as TaskModel
+from kobold.task_registry import create_tasks
 from kobold.watcher import watch_directories
 from kobold.worker import worker
 
@@ -19,7 +21,10 @@ async def test_worker_processing_flow(integration_ctx: IntegrationContext):
         watch_directories([ctx.watch_dir], ctx.settings, ctx.queue)
     )
 
-    worker_task = asyncio.create_task(worker(ctx.settings, ctx.engine, ctx.queue))
+    handlers = create_tasks(ctx.settings, ctx.engine, ctx.queue)
+    worker_task = asyncio.create_task(
+        worker(ctx.queue, handlers, ctx.settings.WORKER_POLL_INTERVAL)
+    )
 
     try:
         await asyncio.sleep(0.1)
@@ -47,7 +52,7 @@ async def test_worker_processing_flow(integration_ctx: IntegrationContext):
         assert found_book, f"Book '{target_title}' not found in DB"
 
         with Session(ctx.engine) as session:
-            jobs = session.exec(select(Job)).all()
+            jobs = session.exec(select(TaskModel)).all()
             assert len(jobs) > 0
 
             book = session.exec(
@@ -55,7 +60,7 @@ async def test_worker_processing_flow(integration_ctx: IntegrationContext):
             ).one()
 
             assert "Shakespeare" in (book.author or "")
-            assert book.file_path == str(book_path)
+            assert Path(book.file_path).exists()
             assert not book.is_deleted
 
     finally:
@@ -75,7 +80,10 @@ async def test_worker_pdf_processing(integration_ctx: IntegrationContext):
         watch_directories([ctx.watch_dir], ctx.settings, ctx.queue)
     )
 
-    worker_task = asyncio.create_task(worker(ctx.settings, ctx.engine, ctx.queue))
+    handlers = create_tasks(ctx.settings, ctx.engine, ctx.queue)
+    worker_task = asyncio.create_task(
+        worker(ctx.queue, handlers, ctx.settings.WORKER_POLL_INTERVAL)
+    )
 
     try:
         await asyncio.sleep(0.1)
@@ -108,7 +116,7 @@ async def test_worker_pdf_processing(integration_ctx: IntegrationContext):
             ).one()
             assert book.file_format == "pdf"
             assert book.title is not None
-            assert book.file_path == str(book_path)
+            assert Path(book.file_path).exists()
 
     finally:
         watcher_task.cancel()

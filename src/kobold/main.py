@@ -10,10 +10,11 @@ from .api.routes import router as api_router
 from .config import get_settings
 from .database import create_db_and_tables, engine
 from .http_client import HttpClientManager
-from .job_queue import JobQueue
 from .logging_config import configure_logging, get_logger
 from .scanner import ScannerService
 from .scheduler import schedule_periodic_scans
+from .task_queue import TaskQueue
+from .task_registry import create_tasks
 from .watcher import watch_directories
 from .worker import worker
 
@@ -37,13 +38,13 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
 
     create_db_and_tables()
 
-    queue = JobQueue(settings, engine)
+    queue = TaskQueue(settings, engine)
+    tasks = create_tasks(settings, engine, queue)
 
-    recovered = queue.recover_stale_jobs()
-    if recovered:
-        logger.info("Recovered stale jobs", count=recovered)
-
-    worker_task = asyncio.create_task(worker(settings, engine, queue), name="worker")
+    worker_task = asyncio.create_task(
+        worker(queue, tasks, settings.WORKER_POLL_INTERVAL),
+        name="worker",
+    )
     logger.info("Worker started")
 
     watcher_task = asyncio.create_task(

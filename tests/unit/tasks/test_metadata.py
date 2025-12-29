@@ -4,8 +4,9 @@ from uuid import uuid4
 import pytest
 from sqlmodel import Session
 
-from kobold.models import Book, JobType
-from kobold.services.metadata_service import MetadataJobService
+from kobold.models import Book
+from kobold.tasks.metadata import MetadataTask
+from kobold.tasks.organize import OrganizeTask
 
 
 @pytest.fixture
@@ -40,13 +41,11 @@ def mock_queue():
 
 @pytest.fixture
 def service(mock_settings, mock_engine, mock_metadata_manager, mock_queue):
-    return MetadataJobService(
-        mock_settings, mock_engine, mock_metadata_manager, mock_queue
-    )
+    return MetadataTask(mock_settings, mock_engine, mock_metadata_manager, mock_queue)
 
 
 @pytest.mark.asyncio
-async def test_process_job_successful(
+async def test_process_successful(
     service, mock_engine, mock_metadata_manager, mock_queue, mock_settings
 ):
     mock_settings.ORGANIZE_LIBRARY = True
@@ -74,8 +73,8 @@ async def test_process_job_successful(
         "author": "New Author",
     }
 
-    with patch("kobold.services.metadata_service.Session", return_value=mock_session):
-        await service.process_job(payload)
+    with patch("kobold.tasks.metadata.Session", return_value=mock_session):
+        await service.process(payload)
 
     mock_session.get.assert_called_with(Book, book_id)
     assert real_book.title == "New Title"
@@ -83,28 +82,28 @@ async def test_process_job_successful(
     mock_session.add.assert_called_with(real_book)
     mock_session.commit.assert_called()
 
-    mock_queue.add_job.assert_called_once()
-    call_args = mock_queue.add_job.call_args
-    assert call_args[0][0] == JobType.ORGANIZE
+    mock_queue.add_task.assert_called_once()
+    call_args = mock_queue.add_task.call_args
+    assert call_args[0][0] == OrganizeTask.TASK_TYPE
     assert call_args[1]["payload"] == {"book_id": str(book_id)}
 
 
 @pytest.mark.asyncio
-async def test_process_job_ignores_non_existent_book(service, mock_session):
+async def test_process_ignores_non_existent_book(service, mock_session):
     book_id = "123e4567-e89b-12d3-a456-426614174000"
     mock_session_instance = MagicMock(spec=Session)
     mock_session.return_value.__enter__.return_value = mock_session_instance
     mock_session.return_value.__enter__.return_value = mock_session_instance
     mock_session_instance.get.return_value = None
 
-    with patch("kobold.services.metadata_service.Session", mock_session):
-        await service.process_job({"book_id": book_id})
+    with patch("kobold.tasks.metadata.Session", mock_session):
+        await service.process({"book_id": book_id})
 
     service.metadata_manager.get_metadata.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_process_job_handles_no_metadata_found(
+async def test_process_handles_no_metadata_found(
     service, mock_session, mock_metadata_manager
 ):
     book_id = "123e4567-e89b-12d3-a456-426614174000"
@@ -120,15 +119,15 @@ async def test_process_job_handles_no_metadata_found(
 
     mock_metadata_manager.get_metadata.return_value = None
 
-    with patch("kobold.services.metadata_service.Session", mock_session):
-        await service.process_job({"book_id": book_id})
+    with patch("kobold.tasks.metadata.Session", mock_session):
+        await service.process({"book_id": book_id})
 
     mock_session_instance.add.assert_not_called()
     mock_session_instance.commit.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_process_job_handles_no_updated_fields(
+async def test_process_handles_no_updated_fields(
     service, mock_session, mock_metadata_manager
 ):
     book_id = "123e4567-e89b-12d3-a456-426614174000"
@@ -148,15 +147,15 @@ async def test_process_job_handles_no_updated_fields(
         "author": "Current Author",
     }
 
-    with patch("kobold.services.metadata_service.Session", mock_session):
-        await service.process_job({"book_id": book_id})
+    with patch("kobold.tasks.metadata.Session", mock_session):
+        await service.process({"book_id": book_id})
 
     mock_session_instance.add.assert_not_called()
     mock_session_instance.commit.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_process_job_ignores_unknown_fields(
+async def test_process_ignores_unknown_fields(
     service, mock_session, mock_metadata_manager
 ):
     book_id = "123e4567-e89b-12d3-a456-426614174000"
@@ -173,15 +172,15 @@ async def test_process_job_ignores_unknown_fields(
         return_value={"unknown_field": "some value"}
     )
 
-    with patch("kobold.services.metadata_service.Session", mock_session):
-        await service.process_job({"book_id": book_id})
+    with patch("kobold.tasks.metadata.Session", mock_session):
+        await service.process({"book_id": book_id})
 
     mock_session_instance.add.assert_not_called()
     mock_session_instance.commit.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_process_job_handles_cover_download_failure(
+async def test_process_handles_cover_download_failure(
     service, mock_session, mock_metadata_manager, mock_engine
 ):
     book_id = "123e4567-e89b-12d3-a456-426614174000"
@@ -204,13 +203,13 @@ async def test_process_job_handles_cover_download_failure(
     mock_client.get.return_value.status_code = 404
 
     with (
-        patch("kobold.services.metadata_service.Session", mock_session),
+        patch("kobold.tasks.metadata.Session", mock_session),
         patch(
-            "kobold.services.metadata_service.HttpClientManager.get_client",
+            "kobold.tasks.metadata.HttpClientManager.get_client",
             AsyncMock(return_value=mock_client),
         ),
     ):
-        await service.process_job({"book_id": book_id})
+        await service.process({"book_id": book_id})
 
         expected_metadata = {
             "title": "Title",
@@ -222,7 +221,7 @@ async def test_process_job_handles_cover_download_failure(
 
 
 @pytest.mark.asyncio
-async def test_process_job_handles_cover_download_exception(
+async def test_process_handles_cover_download_exception(
     service, mock_session, mock_metadata_manager, mock_engine
 ):
     book_id = "123e4567-e89b-12d3-a456-426614174000"
@@ -245,13 +244,13 @@ async def test_process_job_handles_cover_download_exception(
     mock_client.get.side_effect = Exception("Network error")
 
     with (
-        patch("kobold.services.metadata_service.Session", mock_session),
+        patch("kobold.tasks.metadata.Session", mock_session),
         patch(
-            "kobold.services.metadata_service.HttpClientManager.get_client",
+            "kobold.tasks.metadata.HttpClientManager.get_client",
             AsyncMock(return_value=mock_client),
         ),
     ):
-        await service.process_job({"book_id": book_id})
+        await service.process({"book_id": book_id})
 
         expected_metadata = {
             "title": "Title",
@@ -263,7 +262,7 @@ async def test_process_job_handles_cover_download_exception(
 
 
 @pytest.mark.asyncio
-async def test_process_job_embeds_metadata(
+async def test_process_embeds_metadata(
     service, mock_session, mock_metadata_manager, mock_engine
 ):
     book_id = "123e4567-e89b-12d3-a456-426614174000"
@@ -287,13 +286,13 @@ async def test_process_job_embeds_metadata(
     mock_client.get.return_value.content = b"cover_data"
 
     with (
-        patch("kobold.services.metadata_service.Session", mock_session),
+        patch("kobold.tasks.metadata.Session", mock_session),
         patch(
-            "kobold.services.metadata_service.HttpClientManager.get_client",
+            "kobold.tasks.metadata.HttpClientManager.get_client",
             AsyncMock(return_value=mock_client),
         ),
     ):
-        await service.process_job({"book_id": book_id})
+        await service.process({"book_id": book_id})
 
         expected_metadata = {
             "title": "Title",

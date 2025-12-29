@@ -11,6 +11,7 @@ from tests.conftest import IntegrationContext
 
 from kobold.config import Settings
 from kobold.models import Book
+from kobold.tasks.metadata import MetadataTask
 from kobold.watcher import watch_directories
 
 
@@ -20,7 +21,7 @@ async def hooks_ctx(
     mock_amazon_provider: AsyncMock,
     mock_kepub_converter: AsyncMock,
 ):
-    from kobold.job_queue import JobQueue
+    from kobold.task_queue import TaskQueue
 
     watch_dir = tmp_path / "books"
     watch_dir.mkdir()
@@ -40,7 +41,7 @@ async def hooks_ctx(
         FETCH_EXTERNAL_METADATA=True,
     )
 
-    test_queue = JobQueue(test_settings, test_engine)
+    test_queue = TaskQueue(test_settings, test_engine)
 
     mock_amazon_provider.fetch_metadata = AsyncMock(
         return_value={
@@ -102,10 +103,13 @@ async def test_embed_metadata_epub(
         completed = False
         for _ in range(50):
             with Session(ctx.engine) as session:
-                from kobold.models import Job, JobStatus
+                from kobold.models import Task as TaskModel
+                from kobold.models import TaskStatus
 
-                job = session.exec(select(Job).where(Job.type == "METADATA")).first()
-                if job and job.status == JobStatus.COMPLETED:
+                job = session.exec(
+                    select(TaskModel).where(TaskModel.type == MetadataTask.TASK_TYPE)
+                ).first()
+                if job and job.status == TaskStatus.COMPLETED:
                     completed = True
                     break
             await asyncio.sleep(0.05)
@@ -170,10 +174,13 @@ async def test_embed_metadata_pdf(
         completed = False
         for _ in range(50):
             with Session(ctx.engine) as session:
-                from kobold.models import Job, JobStatus
+                from kobold.models import Task as TaskModel
+                from kobold.models import TaskStatus
 
-                job = session.exec(select(Job).where(Job.type == "METADATA")).first()
-                if job and job.status == JobStatus.COMPLETED:
+                job = session.exec(
+                    select(TaskModel).where(TaskModel.type == MetadataTask.TASK_TYPE)
+                ).first()
+                if job and job.status == TaskStatus.COMPLETED:
                     completed = True
                     break
             await asyncio.sleep(0.05)

@@ -15,11 +15,11 @@ from watchfiles import Change, DefaultFilter, awatch
 
 from .constants import SUPPORTED_EXTENSIONS
 from .logging_config import get_logger
-from .models import JobType
+from .tasks.ingest import IngestTask
 
 if TYPE_CHECKING:
     from .config import Settings
-    from .job_queue import JobQueue
+    from .task_queue import TaskQueue
 
 logger = get_logger(__name__)
 
@@ -49,7 +49,7 @@ class BookFilter(DefaultFilter):
 async def watch_directories(
     watch_dirs: list[Path],
     settings: Settings,
-    queue: JobQueue,
+    queue: TaskQueue,
 ) -> None:
     """
     Watch directories for file changes and enqueue jobs.
@@ -116,8 +116,8 @@ async def watch_directories(
                     path=path_str,
                 )
 
-                queue.add_job(
-                    job_type=JobType.INGEST,
+                queue.add_task(
+                    task_type=IngestTask.TASK_TYPE,
                     payload={
                         "event": event,
                         "path": path_str,

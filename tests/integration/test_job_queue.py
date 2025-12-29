@@ -3,11 +3,15 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
-from kobold.job_queue import JobQueue
-from kobold.models import Job, JobStatus, JobType
+from kobold.models import Task as TaskModel
+from kobold.models import TaskStatus
+from kobold.task_queue import TaskQueue
+from kobold.tasks.convert import ConvertTask
+from kobold.tasks.ingest import IngestTask
+from kobold.tasks.metadata import MetadataTask
 
 
-class TestJobQueue:
+class TestTaskQueue:
     @pytest.fixture
     def test_engine(self, tmp_path):
         db_path = tmp_path / "test.db"
@@ -28,56 +32,37 @@ class TestJobQueue:
         return settings
 
     @pytest.fixture
-    def job_queue(self, test_engine, mock_settings) -> JobQueue:
-        return JobQueue(mock_settings, test_engine)
+    def task_queue(self, test_engine, mock_settings) -> TaskQueue:
+        return TaskQueue(mock_settings, test_engine)
 
-    def test_add_job(self, job_queue: JobQueue) -> None:
-        result = job_queue.add_job(
-            JobType.INGEST,
+    def test_add_task(self, task_queue: TaskQueue) -> None:
+        result = task_queue.add_task(
+            IngestTask.TASK_TYPE,
             payload={"path": "/test/file.epub"},
         )
 
         assert result is not None
-        assert result.type == JobType.INGEST
-        assert result.status == JobStatus.PENDING
+        assert result.type == IngestTask.TASK_TYPE
+        assert result.status == TaskStatus.PENDING
         assert result.payload["path"] == "/test/file.epub"
 
-    def test_add_job_with_deduplication(
+    def test_fetch_next_task_empty_queue(
         self,
-        job_queue: JobQueue,
+        task_queue: TaskQueue,
     ) -> None:
-        job1 = job_queue.add_job(
-            JobType.INGEST,
-            payload={"path": "/test/file.epub"},
-            deduplicate_key="/test/file.epub",
-        )
-
-        job2 = job_queue.add_job(
-            JobType.INGEST,
-            payload={"path": "/test/file.epub"},
-            deduplicate_key="/test/file.epub",
-        )
-
-        assert job1 is not None
-        assert job2 is None  # Should be deduplicated
-
-    def test_fetch_next_job_empty_queue(
-        self,
-        job_queue: JobQueue,
-    ) -> None:
-        result = job_queue.fetch_next_job()
+        result = task_queue.fetch_next_task()
         assert result is None
 
-    def test_fetch_next_job_fifo_order(
+    def test_fetch_next_task_fifo_order(
         self,
-        job_queue: JobQueue,
+        task_queue: TaskQueue,
     ) -> None:
-        job_queue.add_job(JobType.INGEST, payload={"order": 1})
-        job_queue.add_job(JobType.INGEST, payload={"order": 2})
-        job_queue.add_job(JobType.INGEST, payload={"order": 3})
+        task_queue.add_task(IngestTask.TASK_TYPE, payload={"order": 1})
+        task_queue.add_task(IngestTask.TASK_TYPE, payload={"order": 2})
+        task_queue.add_task(IngestTask.TASK_TYPE, payload={"order": 3})
 
-        first = job_queue.fetch_next_job()
-        second = job_queue.fetch_next_job()
+        first = task_queue.fetch_next_task()
+        second = task_queue.fetch_next_task()
 
         assert first is not None
         assert second is not None
@@ -85,82 +70,82 @@ class TestJobQueue:
         assert first.payload["order"] == 1
         assert second.payload["order"] == 2
 
-    def test_fetch_next_job_marks_as_processing(
+    def test_fetch_next_task_marks_as_processing(
         self,
-        job_queue: JobQueue,
+        task_queue: TaskQueue,
     ) -> None:
-        job_queue.add_job(JobType.METADATA, payload={})
+        task_queue.add_task(MetadataTask.TASK_TYPE, payload={})
 
-        fetched = job_queue.fetch_next_job()
+        fetched = task_queue.fetch_next_task()
 
         assert fetched is not None
-        assert fetched.status == JobStatus.PROCESSING
+        assert fetched.status == TaskStatus.PROCESSING
         assert fetched.started_at is not None
 
-    def test_complete_job_success(
+    def test_complete_task_success(
         self,
-        job_queue: JobQueue,
+        task_queue: TaskQueue,
         test_engine,
     ) -> None:
-        job_queue.add_job(JobType.CONVERT, payload={})
-        fetched = job_queue.fetch_next_job()
+        task_queue.add_task(ConvertTask.TASK_TYPE, payload={})
+        fetched = task_queue.fetch_next_task()
         assert fetched is not None
 
-        job_queue.complete_job(fetched.id)
+        task_queue.complete_task(fetched.id)
 
         with Session(test_engine) as session:
-            completed = session.get(Job, fetched.id)
+            completed = session.get(TaskModel, fetched.id)
             assert completed is not None
-            assert completed.status == JobStatus.COMPLETED
+            assert completed.status == TaskStatus.COMPLETED
             assert completed.completed_at is not None
 
-    def test_complete_job_with_error(
+    def test_complete_task_with_error(
         self,
-        job_queue: JobQueue,
+        task_queue: TaskQueue,
         test_engine,
     ) -> None:
-        job_queue.add_job(JobType.INGEST, payload={})
-        fetched = job_queue.fetch_next_job()
+        task_queue.add_task(IngestTask.TASK_TYPE, payload={})
+        fetched = task_queue.fetch_next_task()
         assert fetched is not None
 
-        job_queue.complete_job(fetched.id, error="Something went wrong")
+        task_queue.complete_task(fetched.id, error="Something went wrong")
 
         with Session(test_engine) as session:
-            failed = session.get(Job, fetched.id)
+            failed = session.get(TaskModel, fetched.id)
             assert failed is not None
-            assert failed.status == JobStatus.FAILED
+            assert failed.status == TaskStatus.FAILED
             assert failed.error_message == "Something went wrong"
 
-    def test_retry_job(
+    def test_retry_task(
         self,
-        job_queue: JobQueue,
+        task_queue: TaskQueue,
         test_engine,
     ) -> None:
-        job_queue.add_job(JobType.METADATA, payload={})
-        fetched = job_queue.fetch_next_job()
+        task_queue.add_task(MetadataTask.TASK_TYPE, payload={})
+        fetched = task_queue.fetch_next_task()
         assert fetched is not None
 
-        job_queue.retry_job(fetched.id, "Temporary error")
+        task_queue.retry_task(fetched.id, "Temporary error")
 
         with Session(test_engine) as session:
-            retried = session.get(Job, fetched.id)
+            retried = session.get(TaskModel, fetched.id)
             assert retried is not None
-            assert retried.status == JobStatus.PENDING
+            assert retried.status == TaskStatus.PENDING
             assert retried.retry_count == 1
             assert retried.next_retry_at is not None
             assert retried.error_message == "Temporary error"
 
-    def test_recover_stale_jobs(
+    def test_recover_stale_tasks(
         self,
-        job_queue: JobQueue,
+        task_queue: TaskQueue,
         test_engine,
         mock_settings,
     ) -> None:
         with Session(test_engine) as session:
-            stale_job = Job(
-                type=JobType.INGEST,
+            stale_job = TaskModel(
+                type=IngestTask.TASK_TYPE,
                 payload={"path": "/stale"},
-                status=JobStatus.PROCESSING,
+                status=TaskStatus.PROCESSING,
                 started_at=datetime.now(UTC) - timedelta(hours=2),
             )
             session.add(stale_job)
@@ -170,49 +155,74 @@ class TestJobQueue:
         mock_settings.JOB_STALE_MINUTES = 30
         mock_settings.JOB_MAX_RETRIES = 3
 
-        recovered = job_queue.recover_stale_jobs()
+        recovered = task_queue.recover_stale_tasks()
 
         assert recovered == 1
 
         with Session(test_engine) as session:
-            job = session.get(Job, stale_id)
+            job = session.get(TaskModel, stale_id)
             assert job is not None
-            assert job.status == JobStatus.PENDING
+            assert job.status == TaskStatus.PENDING
 
     def test_complete_unknown_job_handles_gracefully(
         self,
-        job_queue: JobQueue,
+        task_queue: TaskQueue,
     ) -> None:
         from uuid import uuid4
 
         unknown_id = uuid4()
         # Should not raise
-        job_queue.complete_job(unknown_id)
+        task_queue.complete_task(unknown_id)
 
     def test_retry_unknown_job_handles_gracefully(
         self,
-        job_queue: JobQueue,
+        task_queue: TaskQueue,
     ) -> None:
         from uuid import uuid4
 
         unknown_id = uuid4()
         # Should not raise
-        job_queue.retry_job(unknown_id, "Some error")
+        task_queue.retry_task(unknown_id, "Some error")
 
     def test_get_queue_stats(
         self,
-        job_queue: JobQueue,
+        task_queue: TaskQueue,
     ) -> None:
-        job_queue.add_job(JobType.INGEST, payload={"order": 1})
-        job_queue.add_job(JobType.INGEST, payload={"order": 2})
-        job_queue.add_job(JobType.METADATA, payload={})
+        task_queue.add_task(IngestTask.TASK_TYPE, payload={"order": 1})
+        task_queue.add_task(IngestTask.TASK_TYPE, payload={"order": 2})
+        task_queue.add_task(MetadataTask.TASK_TYPE, payload={})
 
-        job = job_queue.fetch_next_job()
+        job = task_queue.fetch_next_task()
         assert job is not None
-        job_queue.complete_job(job.id)
+        task_queue.complete_task(job.id)
 
-        stats = job_queue.get_queue_stats()
+        stats = task_queue.get_queue_stats()
 
         assert stats["PENDING"] == 2
         assert stats["COMPLETED"] == 1
         assert stats["PROCESSING"] == 0
+
+    def test_task_event_is_set_when_job_added(
+        self,
+        task_queue: TaskQueue,
+    ) -> None:
+        """Adding a job signals the event for real-time processing."""
+        assert not task_queue.task_event.is_set()
+
+        task_queue.add_task(IngestTask.TASK_TYPE, payload={"path": "/test.epub"})
+
+        assert task_queue.task_event.is_set()
+
+    def test_task_event_can_be_cleared_and_reused(
+        self,
+        task_queue: TaskQueue,
+    ) -> None:
+        """Event can be cleared and re-triggered for multiple jobs."""
+        task_queue.add_task(IngestTask.TASK_TYPE, payload={"path": "/first.epub"})
+        assert task_queue.task_event.is_set()
+
+        task_queue.task_event.clear()
+        assert not task_queue.task_event.is_set()
+
+        task_queue.add_task(MetadataTask.TASK_TYPE, payload={"book_id": "123"})
+        assert task_queue.task_event.is_set()

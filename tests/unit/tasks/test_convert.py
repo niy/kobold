@@ -5,7 +5,7 @@ import pytest
 from sqlmodel import Session
 
 from kobold.models import Book
-from kobold.services.conversion_service import ConversionJobService
+from kobold.tasks.convert import ConvertTask
 
 
 @pytest.fixture
@@ -30,11 +30,11 @@ def mock_converter():
 
 @pytest.fixture
 def conversion_service(mock_settings, mock_engine, mock_converter):
-    return ConversionJobService(mock_settings, mock_engine, mock_converter)
+    return ConvertTask(mock_settings, mock_engine, mock_converter)
 
 
 @pytest.mark.asyncio
-async def test_process_job_converts_book(
+async def test_process_converts_book(
     conversion_service, mock_session, mock_converter, mock_engine
 ):
     book_id = "123e4567-e89b-12d3-a456-426614174000"
@@ -50,13 +50,13 @@ async def test_process_job_converts_book(
     mock_session_instance.get.return_value = mock_book
 
     with (
-        patch("kobold.services.conversion_service.Session", mock_session),
+        patch("kobold.tasks.convert.Session", mock_session),
         patch("pathlib.Path.exists", return_value=True),
         patch("pathlib.Path.parent", new_callable=lambda: Path("/books")),
     ):
         mock_converter.convert = AsyncMock(return_value=Path("/books/test.kepub.epub"))
 
-        await conversion_service.process_job({"book_id": book_id})
+        await conversion_service.process({"book_id": book_id})
 
         mock_converter.convert.assert_called_once()
 
@@ -67,7 +67,7 @@ async def test_process_job_converts_book(
 
 
 @pytest.mark.asyncio
-async def test_process_job_deletes_original(
+async def test_process_deletes_original(
     conversion_service, mock_session, mock_converter, mock_engine
 ):
     book_id = "123e4567-e89b-12d3-a456-426614174000"
@@ -89,38 +89,36 @@ async def test_process_job_deletes_original(
     mock_converter.convert = AsyncMock(return_value=Path("/books/test.kepub.epub"))
 
     with (
-        patch("kobold.services.conversion_service.Session", mock_session),
-        patch("kobold.services.conversion_service.Path", return_value=mock_path),
+        patch("kobold.tasks.convert.Session", mock_session),
+        patch("kobold.tasks.convert.Path", return_value=mock_path),
     ):
-        await conversion_service.process_job({"book_id": book_id})
+        await conversion_service.process({"book_id": book_id})
 
         mock_path.unlink.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_process_job_missing_book_id(conversion_service):
+async def test_process_missing_book_id(conversion_service):
     """When book_id is missing from payload, job returns early without error."""
-    await conversion_service.process_job({})
+    await conversion_service.process({})
     # No exception raised, function returns early
 
 
 @pytest.mark.asyncio
-async def test_process_job_nonexistent_book(
-    conversion_service, mock_session, mock_engine
-):
+async def test_process_nonexistent_book(conversion_service, mock_session, mock_engine):
     """When book doesn't exist in database, job returns early without error."""
     mock_session_instance = MagicMock(spec=Session)
     mock_session.return_value.__enter__.return_value = mock_session_instance
     mock_session_instance.get.return_value = None
 
-    with patch("kobold.services.conversion_service.Session", mock_session):
-        await conversion_service.process_job(
+    with patch("kobold.tasks.convert.Session", mock_session):
+        await conversion_service.process(
             {"book_id": "123e4567-e89b-12d3-a456-426614174000"}
         )
 
 
 @pytest.mark.asyncio
-async def test_process_job_already_converted(
+async def test_process_already_converted(
     conversion_service, mock_session, mock_converter, mock_engine
 ):
     mock_book = Mock(spec=Book)
@@ -131,8 +129,8 @@ async def test_process_job_already_converted(
     mock_session.return_value.__enter__.return_value = mock_session_instance
     mock_session_instance.get.return_value = mock_book
 
-    with patch("kobold.services.conversion_service.Session", mock_session):
-        await conversion_service.process_job(
+    with patch("kobold.tasks.convert.Session", mock_session):
+        await conversion_service.process(
             {"book_id": "123e4567-e89b-12d3-a456-426614174000"}
         )
 
@@ -140,7 +138,7 @@ async def test_process_job_already_converted(
 
 
 @pytest.mark.asyncio
-async def test_process_job_source_file_not_found(
+async def test_process_source_file_not_found(
     conversion_service, mock_session, mock_engine
 ):
     mock_book = Mock(spec=Book)
@@ -153,17 +151,17 @@ async def test_process_job_source_file_not_found(
     mock_session_instance.get.return_value = mock_book
 
     with (
-        patch("kobold.services.conversion_service.Session", mock_session),
+        patch("kobold.tasks.convert.Session", mock_session),
         patch("pathlib.Path.exists", return_value=False),
         pytest.raises(FileNotFoundError),
     ):
-        await conversion_service.process_job(
+        await conversion_service.process(
             {"book_id": "123e4567-e89b-12d3-a456-426614174000"}
         )
 
 
 @pytest.mark.asyncio
-async def test_process_job_conversion_fails(
+async def test_process_conversion_fails(
     conversion_service, mock_session, mock_converter, mock_engine
 ):
     mock_book = Mock(spec=Book)
@@ -178,17 +176,17 @@ async def test_process_job_conversion_fails(
     mock_converter.convert = AsyncMock(return_value=None)
 
     with (
-        patch("kobold.services.conversion_service.Session", mock_session),
+        patch("kobold.tasks.convert.Session", mock_session),
         patch("pathlib.Path.exists", return_value=True),
         pytest.raises(RuntimeError, match="Conversion returned no output path"),
     ):
-        await conversion_service.process_job(
+        await conversion_service.process(
             {"book_id": "123e4567-e89b-12d3-a456-426614174000"}
         )
 
 
 @pytest.mark.asyncio
-async def test_process_job_delete_fails_gracefully(
+async def test_process_delete_fails_gracefully(
     conversion_service, mock_session, mock_converter, mock_engine
 ):
     book_id = "123e4567-e89b-12d3-a456-426614174000"
@@ -211,9 +209,9 @@ async def test_process_job_delete_fails_gracefully(
     mock_converter.convert = AsyncMock(return_value=Path("/books/test.kepub.epub"))
 
     with (
-        patch("kobold.services.conversion_service.Session", mock_session),
-        patch("kobold.services.conversion_service.Path", return_value=mock_path),
+        patch("kobold.tasks.convert.Session", mock_session),
+        patch("kobold.tasks.convert.Path", return_value=mock_path),
     ):
-        await conversion_service.process_job({"book_id": book_id})
+        await conversion_service.process({"book_id": book_id})
 
     assert mock_book.is_converted is True

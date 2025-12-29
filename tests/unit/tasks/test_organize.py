@@ -7,7 +7,7 @@ from sqlmodel import Session
 
 from kobold.models import Book
 from kobold.organizer import LibraryOrganizer
-from kobold.services.organization_service import OrganizationJobService
+from kobold.tasks.organize import OrganizeTask
 
 
 @pytest.fixture
@@ -31,11 +31,11 @@ def mock_organizer():
 
 @pytest.fixture
 def service(mock_settings, mock_engine, mock_organizer):
-    return OrganizationJobService(mock_settings, mock_engine, mock_organizer)
+    return OrganizeTask(mock_settings, mock_engine, mock_organizer)
 
 
 @pytest.mark.asyncio
-async def test_process_job_organizes_book(service, mock_engine):
+async def test_process_organizes_book(service, mock_engine):
     book_id = uuid4()
     payload = {"book_id": str(book_id)}
 
@@ -65,10 +65,8 @@ async def test_process_job_organizes_book(service, mock_engine):
     )
     mock_organizer.organize_book.return_value = str(mock_expected_path)
 
-    with patch(
-        "kobold.services.organization_service.Session", return_value=mock_session
-    ):
-        await service.process_job(payload)
+    with patch("kobold.tasks.organize.Session", return_value=mock_session):
+        await service.process(payload)
 
     mock_organizer.organize_book.assert_called_once()
     assert real_book.file_path == str(mock_expected_path)
@@ -77,7 +75,7 @@ async def test_process_job_organizes_book(service, mock_engine):
 
 
 @pytest.mark.asyncio
-async def test_process_job_recovers_from_zombie_state(service, mock_engine):
+async def test_process_recovers_from_zombie_state(service, mock_engine):
     book_id = uuid4()
     payload = {"book_id": str(book_id)}
 
@@ -108,15 +106,13 @@ async def test_process_job_recovers_from_zombie_state(service, mock_engine):
     )
 
     with (
+        patch("kobold.tasks.organize.Session", return_value=mock_session),
         patch(
-            "kobold.services.organization_service.Session", return_value=mock_session
-        ),
-        patch(
-            "kobold.services.organization_service.get_file_hash",
+            "kobold.tasks.organize.get_file_hash",
             return_value="dummy_hash",
         ) as mock_hash,
     ):
-        await service.process_job(payload)
+        await service.process(payload)
 
     mock_hash.assert_called_once_with(mock_expected_path)
     service.organizer.organize_book.assert_not_called()
@@ -125,7 +121,7 @@ async def test_process_job_recovers_from_zombie_state(service, mock_engine):
 
 
 @pytest.mark.asyncio
-async def test_process_job_fails_recovery_on_hash_mismatch(service, mock_engine):
+async def test_process_fails_recovery_on_hash_mismatch(service, mock_engine):
     book_id = uuid4()
     payload = {"book_id": str(book_id)}
 
@@ -154,22 +150,20 @@ async def test_process_job_fails_recovery_on_hash_mismatch(service, mock_engine)
     )
 
     with (
+        patch("kobold.tasks.organize.Session", return_value=mock_session),
         patch(
-            "kobold.services.organization_service.Session", return_value=mock_session
-        ),
-        patch(
-            "kobold.services.organization_service.get_file_hash",
+            "kobold.tasks.organize.get_file_hash",
             return_value="wrong_hash",
         ),
         pytest.raises(FileNotFoundError, match=r"Source file .* not found"),
     ):
-        await service.process_job(payload)
+        await service.process(payload)
 
     mock_session.commit.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_process_job_fails_if_source_and_target_missing(service, mock_engine):
+async def test_process_fails_if_source_and_target_missing(service, mock_engine):
     book_id = uuid4()
     payload = {"book_id": str(book_id)}
 
@@ -197,39 +191,37 @@ async def test_process_job_fails_if_source_and_target_missing(service, mock_engi
     )
 
     with (
-        patch(
-            "kobold.services.organization_service.Session", return_value=mock_session
-        ),
+        patch("kobold.tasks.organize.Session", return_value=mock_session),
         pytest.raises(FileNotFoundError, match=r"Source file .* not found"),
     ):
-        await service.process_job(payload)
+        await service.process(payload)
 
     service.organizer.organize_book.assert_not_called()
     mock_session.commit.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_process_job_skips_when_disabled(mock_engine, mock_organizer):
+async def test_process_skips_when_disabled(mock_engine, mock_organizer):
     settings = Mock()
     settings.ORGANIZE_LIBRARY = False
     settings.ORGANIZE_TEMPLATE = "{author}/{title}"
     settings.watch_dirs_list = [Path("/books")]
 
-    service = OrganizationJobService(settings, mock_engine, mock_organizer)
+    service = OrganizeTask(settings, mock_engine, mock_organizer)
 
-    await service.process_job({"book_id": str(uuid4())})
+    await service.process({"book_id": str(uuid4())})
 
     mock_organizer.organize_book.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_process_job_missing_book_id(service):
-    await service.process_job({})
+async def test_process_missing_book_id(service):
+    await service.process({})
     service.organizer.organize_book.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_process_job_nonexistent_book(service):
+async def test_process_nonexistent_book(service):
     book_id = uuid4()
     payload = {"book_id": str(book_id)}
 
@@ -238,16 +230,14 @@ async def test_process_job_nonexistent_book(service):
     mock_session.__enter__ = Mock(return_value=mock_session)
     mock_session.__exit__ = Mock(return_value=None)
 
-    with patch(
-        "kobold.services.organization_service.Session", return_value=mock_session
-    ):
-        await service.process_job(payload)
+    with patch("kobold.tasks.organize.Session", return_value=mock_session):
+        await service.process(payload)
 
     service.organizer.organize_book.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_process_job_hash_verification_error(service):
+async def test_process_hash_verification_error(service):
     book_id = uuid4()
     payload = {"book_id": str(book_id)}
 
@@ -276,20 +266,18 @@ async def test_process_job_hash_verification_error(service):
     )
 
     with (
+        patch("kobold.tasks.organize.Session", return_value=mock_session),
         patch(
-            "kobold.services.organization_service.Session", return_value=mock_session
-        ),
-        patch(
-            "kobold.services.organization_service.get_file_hash",
+            "kobold.tasks.organize.get_file_hash",
             side_effect=Exception("I/O error"),
         ),
         pytest.raises(FileNotFoundError),
     ):
-        await service.process_job(payload)
+        await service.process(payload)
 
 
 @pytest.mark.asyncio
-async def test_process_job_already_organized(service):
+async def test_process_already_organized(service):
     book_id = uuid4()
     payload = {"book_id": str(book_id)}
 
@@ -316,17 +304,15 @@ async def test_process_job_already_organized(service):
     )
     service.organizer.organize_book.return_value = None
 
-    with patch(
-        "kobold.services.organization_service.Session", return_value=mock_session
-    ):
-        await service.process_job(payload)
+    with patch("kobold.tasks.organize.Session", return_value=mock_session):
+        await service.process(payload)
 
     service.organizer.organize_book.assert_called_once()
     mock_session.commit.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_process_job_generic_exception(service):
+async def test_process_generic_exception(service):
     book_id = uuid4()
     payload = {"book_id": str(book_id)}
 
@@ -354,9 +340,7 @@ async def test_process_job_generic_exception(service):
     service.organizer.organize_book.side_effect = RuntimeError("Unexpected error")
 
     with (
-        patch(
-            "kobold.services.organization_service.Session", return_value=mock_session
-        ),
+        patch("kobold.tasks.organize.Session", return_value=mock_session),
         pytest.raises(RuntimeError, match="Unexpected error"),
     ):
-        await service.process_job(payload)
+        await service.process(payload)

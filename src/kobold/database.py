@@ -8,7 +8,7 @@ from .config import get_settings
 from .logging_config import get_logger
 
 # Import models to register them with SQLModel metadata
-from .models import Book, Job, ReadingState  # noqa: F401
+from .models import Book, ReadingState, Task  # noqa: F401
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine

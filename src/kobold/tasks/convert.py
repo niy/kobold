@@ -1,3 +1,5 @@
+"""Task for CONVERT jobs."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,6 +10,7 @@ from sqlmodel import Session
 
 from ..logging_config import get_logger
 from ..models import Book
+from .base import Task
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
@@ -18,21 +21,23 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-class ConversionJobService:
+class ConvertTask(Task):
+    TASK_TYPE = "CONVERT"
+
     def __init__(
         self,
-        settings_obj: Settings,
-        db_engine: Engine,
+        settings: Settings,
+        engine: Engine,
         converter: KepubConverter,
     ):
-        self.settings = settings_obj
-        self.engine = db_engine
+        self.settings = settings
+        self.engine = engine
         self.converter = converter
 
-    async def process_job(self, payload: dict[str, Any]) -> None:
+    async def process(self, payload: dict[str, Any]) -> None:
         book_id_str = payload.get("book_id")
         if not book_id_str:
-            logger.warning("Convert job missing book_id", payload=payload)
+            logger.warning("Convert task missing book_id", payload=payload)
             return
 
         book_id = UUID(book_id_str)
@@ -40,7 +45,9 @@ class ConversionJobService:
         with Session(self.engine) as session:
             book = session.get(Book, book_id)
             if not book:
-                logger.warning("Convert job for non-existent book", book_id=book_id_str)
+                logger.warning(
+                    "Convert task for non-existent book", book_id=book_id_str
+                )
                 return
 
             log = logger.bind(
@@ -76,7 +83,6 @@ class ConversionJobService:
                             "Deleted original file after conversion",
                             path=str(original_path),
                         )
-                        # Note: The watcher will detect deletion and update/delete the book record.
                     except Exception as e:
                         log.error("Failed to delete original file", error=str(e))
 

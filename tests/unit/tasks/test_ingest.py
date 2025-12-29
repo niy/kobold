@@ -4,8 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import pytest
 from sqlmodel import Session
 
-from kobold.models import Book, JobType
-from kobold.services.ingest import IngestService
+from kobold.models import Book
+from kobold.tasks.ingest import IngestTask
+from kobold.tasks.organize import OrganizeTask
 
 
 @pytest.fixture
@@ -19,7 +20,7 @@ def mock_settings():
 
 
 @pytest.fixture
-def mock_job_queue():
+def mock_task_queue():
     return Mock()
 
 
@@ -29,13 +30,13 @@ def mock_engine():
 
 
 @pytest.fixture
-def ingest_service(mock_settings, mock_engine, mock_job_queue):
-    return IngestService(mock_settings, mock_engine, mock_job_queue)
+def ingest_service(mock_settings, mock_engine, mock_task_queue):
+    return IngestTask(mock_settings, mock_engine, mock_task_queue)
 
 
 @pytest.mark.asyncio
-async def test_process_job_dispatch(ingest_service):
-    """Test that process_job dispatches to correct handler."""
+async def test_process_dispatch(ingest_service):
+    """Test that process dispatches to correct handler."""
     with (
         patch.object(ingest_service, "_handle_add", new_callable=AsyncMock) as mock_add,
         patch.object(
@@ -43,23 +44,21 @@ async def test_process_job_dispatch(ingest_service):
         ) as mock_del,
     ):
         # Test ADD
-        await ingest_service.process_job({"event": "ADD", "path": "/path/to/file.epub"})
+        await ingest_service.process({"event": "ADD", "path": "/path/to/file.epub"})
         mock_add.assert_called_once()
         mock_del.assert_not_called()
 
         mock_add.reset_mock()
         mock_del.reset_mock()
 
-        await ingest_service.process_job(
-            {"event": "DELETE", "path": "/path/to/file.epub"}
-        )
+        await ingest_service.process({"event": "DELETE", "path": "/path/to/file.epub"})
         mock_del.assert_called_once()
         mock_add.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_handle_add_new_file(
-    ingest_service, mock_session, mock_job_queue, mock_engine
+    ingest_service, mock_session, mock_task_queue, mock_engine
 ):
     path = Path("/books/new_book.epub")
 
@@ -68,10 +67,10 @@ async def test_handle_add_new_file(
     mock_session_instance.exec.return_value.first.side_effect = [None, None]
 
     with (
-        patch("kobold.services.ingest.Session", mock_session),
+        patch("kobold.tasks.ingest.Session", mock_session),
         patch("pathlib.Path.exists", return_value=True),
         patch("pathlib.Path.stat", return_value=Mock(st_size=1024)),
-        patch("kobold.services.ingest.get_file_hash", return_value="hash123"),
+        patch("kobold.tasks.ingest.get_file_hash", return_value="hash123"),
     ):
         await ingest_service._handle_add(path, Mock())
 
@@ -81,7 +80,7 @@ async def test_handle_add_new_file(
         assert args[0].title == "new_book"
         assert args[0].file_hash == "hash123"
 
-        assert mock_job_queue.add_job.call_count >= 1
+        assert mock_task_queue.add_task.call_count >= 1
 
 
 @pytest.mark.asyncio
@@ -96,7 +95,7 @@ async def test_handle_delete(ingest_service, mock_session, mock_engine):
     mock_session.return_value.__enter__.return_value = mock_session_instance
     mock_session_instance.exec.return_value.first.return_value = mock_book
 
-    with patch("kobold.services.ingest.Session", mock_session):
+    with patch("kobold.tasks.ingest.Session", mock_session):
         await ingest_service._handle_delete(path, Mock())
 
         mock_book.mark_deleted.assert_called_once()
@@ -106,7 +105,7 @@ async def test_handle_delete(ingest_service, mock_session, mock_engine):
 
 @pytest.mark.asyncio
 async def test_handle_add_restores_soft_deleted_book(
-    ingest_service, mock_session, mock_job_queue, mock_engine
+    ingest_service, mock_session, mock_task_queue, mock_engine
 ):
     path = Path("/books/restored_book.epub")
 
@@ -126,10 +125,10 @@ async def test_handle_add_restores_soft_deleted_book(
     ]
 
     with (
-        patch("kobold.services.ingest.Session", mock_session),
+        patch("kobold.tasks.ingest.Session", mock_session),
         patch("pathlib.Path.exists", return_value=True),
         patch("pathlib.Path.stat", return_value=Mock(st_size=1024)),
-        patch("kobold.services.ingest.get_file_hash", return_value="hash456"),
+        patch("kobold.tasks.ingest.get_file_hash", return_value="hash456"),
     ):
         await ingest_service._handle_add(path, Mock())
 
@@ -141,30 +140,28 @@ async def test_handle_add_restores_soft_deleted_book(
 
 
 @pytest.mark.asyncio
-async def test_process_job_missing_path(ingest_service):
+async def test_process_missing_path(ingest_service):
     with (
         patch.object(ingest_service, "_handle_add", new_callable=AsyncMock) as mock_add,
         patch.object(
             ingest_service, "_handle_delete", new_callable=AsyncMock
         ) as mock_del,
     ):
-        await ingest_service.process_job({"event": "ADD"})  # Missing path
+        await ingest_service.process({"event": "ADD"})  # Missing path
 
         mock_add.assert_not_called()
         mock_del.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_process_job_unknown_event(ingest_service):
+async def test_process_unknown_event(ingest_service):
     with (
         patch.object(ingest_service, "_handle_add", new_callable=AsyncMock) as mock_add,
         patch.object(
             ingest_service, "_handle_delete", new_callable=AsyncMock
         ) as mock_del,
     ):
-        await ingest_service.process_job(
-            {"event": "UNKNOWN", "path": "/path/to/file.epub"}
-        )
+        await ingest_service.process({"event": "UNKNOWN", "path": "/path/to/file.epub"})
 
         mock_add.assert_not_called()
         mock_del.assert_not_called()
@@ -188,7 +185,7 @@ async def test_handle_add_unsupported_extension(ingest_service):
 
     with (
         patch("pathlib.Path.exists", return_value=True),
-        patch("kobold.services.ingest.SUPPORTED_EXTENSIONS", {".epub", ".kepub"}),
+        patch("kobold.tasks.ingest.SUPPORTED_EXTENSIONS", {".epub", ".kepub"}),
     ):
         await ingest_service._handle_add(path, Mock())
 
@@ -204,7 +201,7 @@ async def test_handle_add_hashing_failure(ingest_service):
         patch("pathlib.Path.exists", return_value=True),
         patch("pathlib.Path.stat", return_value=Mock(st_size=1024)),
         patch(
-            "kobold.services.ingest.get_file_hash",
+            "kobold.tasks.ingest.get_file_hash",
             side_effect=Exception("Disk error"),
         ),
         pytest.raises(Exception, match="Disk error"),
@@ -227,10 +224,10 @@ async def test_handle_add_idempotency(ingest_service, mock_session):
     mock_session_instance.exec.return_value.first.return_value = mock_book
 
     with (
-        patch("kobold.services.ingest.Session", mock_session),
+        patch("kobold.tasks.ingest.Session", mock_session),
         patch("pathlib.Path.exists", return_value=True),
         patch("pathlib.Path.stat", return_value=Mock(st_size=1024)),
-        patch("kobold.services.ingest.get_file_hash", return_value="hash123"),
+        patch("kobold.tasks.ingest.get_file_hash", return_value="hash123"),
     ):
         await ingest_service._handle_add(path, Mock())
 
@@ -260,7 +257,7 @@ async def test_handle_add_duplicate_file_deleted(ingest_service, mock_session):
         return str(self) == str(new_path)
 
     with (
-        patch("kobold.services.ingest.Session", mock_session),
+        patch("kobold.tasks.ingest.Session", mock_session),
         patch(
             "pathlib.Path.exists",
             start_new_session=True,
@@ -269,7 +266,7 @@ async def test_handle_add_duplicate_file_deleted(ingest_service, mock_session):
         ),
         patch("pathlib.Path.stat", return_value=Mock(st_size=1024)),
         patch("pathlib.Path.unlink") as mock_unlink,
-        patch("kobold.services.ingest.get_file_hash", return_value="hash123"),
+        patch("kobold.tasks.ingest.get_file_hash", return_value="hash123"),
     ):
         await ingest_service._handle_add(new_path, Mock())
 
@@ -278,7 +275,7 @@ async def test_handle_add_duplicate_file_deleted(ingest_service, mock_session):
 
 
 @pytest.mark.asyncio
-async def test_handle_add_self_healing(ingest_service, mock_session, mock_job_queue):
+async def test_handle_add_self_healing(ingest_service, mock_session, mock_task_queue):
     """Test Scenario B: Self-healing if original file is missing."""
     new_path = Path("/books/restored.epub")
     original_str = "/books/missing_original.epub"
@@ -302,7 +299,7 @@ async def test_handle_add_self_healing(ingest_service, mock_session, mock_job_qu
         return str(self) == str(new_path)
 
     with (
-        patch("kobold.services.ingest.Session", mock_session),
+        patch("kobold.tasks.ingest.Session", mock_session),
         patch(
             "pathlib.Path.exists",
             start_new_session=True,
@@ -311,7 +308,7 @@ async def test_handle_add_self_healing(ingest_service, mock_session, mock_job_qu
         ),
         patch("pathlib.Path.stat", return_value=Mock(st_size=1024)),
         patch("pathlib.Path.unlink") as mock_unlink,
-        patch("kobold.services.ingest.get_file_hash", return_value="hash123"),
+        patch("kobold.tasks.ingest.get_file_hash", return_value="hash123"),
     ):
         await ingest_service._handle_add(new_path, Mock())
 
@@ -321,7 +318,7 @@ async def test_handle_add_self_healing(ingest_service, mock_session, mock_job_qu
         mock_session_instance.add.assert_called_with(mock_book)
         mock_session_instance.commit.assert_called_once()
 
-        mock_job_queue.add_job.assert_called_with(
-            JobType.ORGANIZE,
+        mock_task_queue.add_task.assert_called_with(
+            OrganizeTask.TASK_TYPE,
             payload={"book_id": str(mock_book.id)},
         )

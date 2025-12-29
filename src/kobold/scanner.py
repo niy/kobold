@@ -4,21 +4,21 @@ from typing import TYPE_CHECKING
 
 from .constants import SUPPORTED_EXTENSIONS
 from .logging_config import get_logger
-from .models import JobType
+from .tasks.ingest import IngestTask
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from .config import Settings
-    from .job_queue import JobQueue
+    from .task_queue import TaskQueue
 
 logger = get_logger(__name__)
 
 
 class ScannerService:
-    def __init__(self, settings: Settings, queue: JobQueue):
+    def __init__(self, settings: Settings, queue: TaskQueue):
         self.settings = settings
-        self.job_queue = queue
+        self.task_queue = queue
 
     async def scan_directories(self, watch_dirs: list[Path] | None = None) -> None:
         logger.info("Starting directory scan...")
@@ -39,8 +39,8 @@ class ScannerService:
                     ext = file_path.suffix.lower()
                     if ext in SUPPORTED_EXTENSIONS:
                         try:
-                            self.job_queue.add_job(
-                                job_type=JobType.INGEST,
+                            self.task_queue.add_task(
+                                task_type=IngestTask.TASK_TYPE,
                                 payload={
                                     "event": "ADD",
                                     "path": str(file_path.absolute()),

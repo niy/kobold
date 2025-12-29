@@ -6,11 +6,11 @@ from uuid import UUID, uuid4
 from sqlmodel import JSON, Field, SQLModel
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Job Queue Models
+# Task Queue Models
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-class JobStatus(str, Enum):
+class TaskStatus(str, Enum):
     PENDING = "PENDING"
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
@@ -18,18 +18,11 @@ class JobStatus(str, Enum):
     DEAD_LETTER = "DEAD_LETTER"
 
 
-class JobType(str, Enum):
-    INGEST = "INGEST"
-    CONVERT = "CONVERT"
-    METADATA = "METADATA"
-    ORGANIZE = "ORGANIZE"
-
-
-class Job(SQLModel, table=True):
+class Task(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    type: JobType = Field(index=True)
+    type: str = Field(index=True)  # Task type string, e.g. "INGEST", "CONVERT"
     payload: dict[str, Any] = Field(default_factory=dict, sa_type=JSON)
-    status: JobStatus = Field(default=JobStatus.PENDING, index=True)
+    status: TaskStatus = Field(default=TaskStatus.PENDING, index=True)
     error_message: str | None = None
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
@@ -41,7 +34,7 @@ class Job(SQLModel, table=True):
     next_retry_at: datetime | None = Field(default=None, index=True)
 
     def __repr__(self) -> str:
-        return f"Job(id={self.id!s:.8}, type={self.type}, status={self.status})"
+        return f"Task(id={self.id!s:.8}, type={self.type}, status={self.status})"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

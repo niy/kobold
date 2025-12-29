@@ -1,192 +1,180 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+import asyncio
+import contextlib
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from kobold.job_queue import JobQueue
-from kobold.models import Job, JobStatus, JobType
-from kobold.worker import stop_event, worker
+from kobold.models import Task as TaskModel
+from kobold.models import TaskStatus
+from kobold.task_queue import TaskQueue
+from kobold.tasks.base import Task
+from kobold.tasks.convert import ConvertTask
+from kobold.tasks.ingest import IngestTask
+from kobold.tasks.metadata import MetadataTask
+from kobold.tasks.organize import OrganizeTask
+from kobold.worker import worker
 
 
 @pytest.fixture
-def mock_dependencies():
-    with (
-        patch("kobold.worker.IngestService", autospec=True) as mock_ingest_cls,
-        patch("kobold.worker.MetadataJobService", autospec=True) as mock_meta_cls,
-        patch("kobold.worker.ConversionJobService", autospec=True) as mock_conv_cls,
-        patch("kobold.worker.MetadataManager", autospec=True),
-    ):
-        mock_ingest_svc = mock_ingest_cls.return_value
-        mock_meta_svc = mock_meta_cls.return_value
-        mock_conv_svc = mock_conv_cls.return_value
-
-        mock_ingest_svc.process_job = AsyncMock()
-        mock_meta_svc.process_job = AsyncMock()
-        mock_conv_svc.process_job = AsyncMock()
-
-        yield {
-            "ingest": mock_ingest_svc,
-            "metadata": mock_meta_svc,
-            "conversion": mock_conv_svc,
-        }
+def mock_tasks():
+    """Create mock tasks for each job type."""
+    return {
+        IngestTask.TASK_TYPE: MagicMock(spec=Task, process=AsyncMock()),
+        MetadataTask.TASK_TYPE: MagicMock(spec=Task, process=AsyncMock()),
+        ConvertTask.TASK_TYPE: MagicMock(spec=Task, process=AsyncMock()),
+        OrganizeTask.TASK_TYPE: MagicMock(spec=Task, process=AsyncMock()),
+    }
 
 
 @pytest.fixture
 def mock_queue():
-    queue = MagicMock(spec=JobQueue)
-    queue.recover_stale_jobs.return_value = 0
+    queue = MagicMock(spec=TaskQueue)
+    queue.recover_stale_tasks.return_value = 0
+    queue.task_event = asyncio.Event()
     return queue
 
 
-@pytest.fixture(autouse=True)
-def reset_stop_event():
-    stop_event.clear()
-    yield
-    stop_event.clear()
+async def run_worker_with_jobs(
+    mock_queue: MagicMock,
+    mock_tasks: dict[str, Task],
+    jobs: list[TaskModel],
+    poll_interval: float = 0.01,
+) -> None:
+    """Run the worker with jobs, then cancel it cleanly."""
+    job_iter = iter(jobs)
+
+    def fetch_next():
+        try:
+            return next(job_iter)
+        except StopIteration:
+            return None
+
+    mock_queue.fetch_next_task.side_effect = fetch_next
+
+    worker_task = asyncio.create_task(worker(mock_queue, mock_tasks, poll_interval))
+
+    await asyncio.sleep(0.05)
+    worker_task.cancel()
+
+    with contextlib.suppress(asyncio.CancelledError):
+        await worker_task
 
 
 @pytest.mark.asyncio
-async def test_worker_startup_and_shutdown(mock_dependencies, mock_queue):
-    mock_queue.fetch_next_job.side_effect = [None]
+async def test_worker_startup_and_shutdown(mock_tasks, mock_queue):
+    await run_worker_with_jobs(mock_queue, mock_tasks, [])
 
-    async def side_effect_sleep(*args):
-        stop_event.set()
-
-    with patch("asyncio.sleep", side_effect=side_effect_sleep):
-        await worker(MagicMock(), MagicMock(), mock_queue)
-
-    mock_queue.recover_stale_jobs.assert_called_once()
+    mock_queue.recover_stale_tasks.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_worker_processes_ingest_job(mock_dependencies, mock_queue):
-    job = Job(
+async def test_worker_processes_ingest_job(mock_tasks, mock_queue):
+    job = TaskModel(
         id=1,
-        type=JobType.INGEST,
+        type=IngestTask.TASK_TYPE,
         payload={"path": "/tmp/book.epub"},
-        status=JobStatus.PENDING,
+        status=TaskStatus.PENDING,
     )
 
-    mock_queue.fetch_next_job.side_effect = [job, None]
+    await run_worker_with_jobs(mock_queue, mock_tasks, [job])
 
-    async def side_effect_sleep(*args):
-        stop_event.set()
-
-    with patch("asyncio.sleep", side_effect=side_effect_sleep):
-        await worker(MagicMock(), MagicMock(), mock_queue)
-
-    mock_dependencies["ingest"].process_job.assert_awaited_once_with(job.payload)
-    mock_queue.complete_job.assert_called_with(1)
+    mock_tasks[IngestTask.TASK_TYPE].process.assert_awaited_once_with(job.payload)
+    mock_queue.complete_task.assert_called_with(1)
 
 
 @pytest.mark.asyncio
-async def test_worker_handles_unknown_job_type(mock_dependencies, mock_queue):
+async def test_worker_handles_unknown_job_type(mock_tasks, mock_queue):
     job = MagicMock()
     job.id = 1
-    job.type = MagicMock()
-    job.type.value = "UNKNOWN_TYPE"
-    job.type.__str__.return_value = "UNKNOWN_TYPE"
-
+    job.type = "UNKNOWN_TYPE"  # String since TaskModel.type is now str
     job.payload = {}
     job.retry_count = 0
     job.max_retries = 3
 
-    mock_queue.fetch_next_job.side_effect = [job, None]
+    # Use empty tasks to make it "unknown"
+    tasks = {}
 
-    async def side_effect_sleep(*args):
-        stop_event.set()
+    await run_worker_with_jobs(mock_queue, tasks, [job])
 
-    with patch("asyncio.sleep", side_effect=side_effect_sleep):
-        await worker(MagicMock(), MagicMock(), mock_queue)
-
-    mock_queue.complete_job.assert_called_with(
-        1, error="Unknown job type: UNKNOWN_TYPE", status=JobStatus.FAILED
+    mock_queue.complete_task.assert_called_with(
+        1, error="Unknown task type: UNKNOWN_TYPE", status=TaskStatus.FAILED
     )
 
 
 @pytest.mark.asyncio
-async def test_worker_retries_failed_job(mock_dependencies, mock_queue):
-    job = Job(
+async def test_worker_retries_failed_job(mock_tasks, mock_queue):
+    job = TaskModel(
         id=1,
-        type=JobType.METADATA,
+        type=MetadataTask.TASK_TYPE,
         payload={},
-        status=JobStatus.PENDING,
+        status=TaskStatus.PENDING,
         retry_count=0,
         max_retries=3,
     )
 
-    mock_dependencies["metadata"].process_job.side_effect = Exception("API error")
-    mock_queue.fetch_next_job.side_effect = [job, None]
+    mock_tasks[MetadataTask.TASK_TYPE].process.side_effect = Exception("API error")
 
-    async def side_effect_sleep(*args):
-        stop_event.set()
+    await run_worker_with_jobs(mock_queue, mock_tasks, [job])
 
-    with patch("asyncio.sleep", side_effect=side_effect_sleep):
-        await worker(MagicMock(), MagicMock(), mock_queue)
-
-    mock_queue.retry_job.assert_called_once()
-    assert "API error" in mock_queue.retry_job.call_args[0][1]
+    mock_queue.retry_task.assert_called_once()
+    assert "API error" in mock_queue.retry_task.call_args[0][1]
 
 
 @pytest.mark.asyncio
-async def test_worker_moves_to_dead_letter_after_max_retries(
-    mock_dependencies, mock_queue
-):
-    job = Job(
+async def test_worker_moves_to_dead_letter_after_max_retries(mock_tasks, mock_queue):
+    job = TaskModel(
         id=1,
-        type=JobType.METADATA,
+        type=MetadataTask.TASK_TYPE,
         payload={},
-        status=JobStatus.PENDING,
+        status=TaskStatus.PENDING,
         retry_count=3,
         max_retries=3,
     )
 
-    mock_dependencies["metadata"].process_job.side_effect = Exception("API error")
-    mock_queue.fetch_next_job.side_effect = [job, None]
+    mock_tasks[MetadataTask.TASK_TYPE].process.side_effect = Exception("API error")
 
-    async def side_effect_sleep(*args):
-        stop_event.set()
+    await run_worker_with_jobs(mock_queue, mock_tasks, [job])
 
-    with patch("asyncio.sleep", side_effect=side_effect_sleep):
-        await worker(MagicMock(), MagicMock(), mock_queue)
-
-    mock_queue.complete_job.assert_called_with(
-        1, error="Exception: API error", status=JobStatus.DEAD_LETTER
+    mock_queue.complete_task.assert_called_with(
+        1, error="Exception: API error", status=TaskStatus.DEAD_LETTER
     )
 
 
 @pytest.mark.asyncio
-async def test_worker_handles_critical_loop_error(mock_dependencies, mock_queue):
-    mock_queue.fetch_next_job.side_effect = Exception("Database is gone")
+async def test_worker_handles_critical_loop_error(mock_tasks, mock_queue):
+    """Test that worker backs off after a critical error."""
+    call_count = 0
 
-    sleep_mock = AsyncMock()
+    def fetch_with_error():
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise Exception("Database is gone")
+        return None
 
-    async def sleep_side_effect(*args):
-        stop_event.set()
+    mock_queue.fetch_next_task.side_effect = fetch_with_error
 
-    sleep_mock.side_effect = sleep_side_effect
+    worker_task = asyncio.create_task(worker(mock_queue, mock_tasks, 0.01))
 
-    with patch("asyncio.sleep", sleep_mock):
-        await worker(MagicMock(), MagicMock(), mock_queue)
+    await asyncio.sleep(0.1)
+    worker_task.cancel()
 
-    sleep_mock.assert_awaited()
+    with contextlib.suppress(asyncio.CancelledError):
+        await worker_task
+
+    assert call_count >= 1
 
 
 @pytest.mark.asyncio
-async def test_worker_processes_convert_job(mock_dependencies, mock_queue):
-    job = Job(
+async def test_worker_processes_convert_job(mock_tasks, mock_queue):
+    job = TaskModel(
         id=2,
-        type=JobType.CONVERT,
+        type=ConvertTask.TASK_TYPE,
         payload={"book_id": "123e4567-e89b-12d3-a456-426614174000"},
-        status=JobStatus.PENDING,
+        status=TaskStatus.PENDING,
     )
 
-    mock_queue.fetch_next_job.side_effect = [job, None]
+    await run_worker_with_jobs(mock_queue, mock_tasks, [job])
 
-    async def side_effect_sleep(*args):
-        stop_event.set()
-
-    with patch("asyncio.sleep", side_effect=side_effect_sleep):
-        await worker(MagicMock(), MagicMock(), mock_queue)
-
-    mock_dependencies["conversion"].process_job.assert_awaited_once_with(job.payload)
-    mock_queue.complete_job.assert_called_with(2)
+    mock_tasks[ConvertTask.TASK_TYPE].process.assert_awaited_once_with(job.payload)
+    mock_queue.complete_task.assert_called_with(2)

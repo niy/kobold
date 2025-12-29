@@ -1,3 +1,5 @@
+"""Task for METADATA jobs."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -7,35 +9,38 @@ from sqlmodel import Session
 
 from ..http_client import HttpClientManager
 from ..logging_config import get_logger
-from ..models import Book, JobType
+from ..models import Book
+from .base import Task
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
 
     from ..config import Settings
-    from ..job_queue import JobQueue
     from ..metadata.manager import MetadataManager
+    from ..task_queue import TaskQueue
 
 logger = get_logger(__name__)
 
 
-class MetadataJobService:
+class MetadataTask(Task):
+    TASK_TYPE = "METADATA"
+
     def __init__(
         self,
-        settings_obj: Settings,
-        db_engine: Engine,
+        settings: Settings,
+        engine: Engine,
         manager: MetadataManager,
-        queue: JobQueue,
+        queue: TaskQueue,
     ):
-        self.settings = settings_obj
-        self.engine = db_engine
+        self.settings = settings
+        self.engine = engine
         self.metadata_manager = manager
-        self.job_queue = queue
+        self.queue = queue
 
-    async def process_job(self, payload: dict[str, Any]) -> None:
+    async def process(self, payload: dict[str, Any]) -> None:
         book_id_str = payload.get("book_id")
         if not book_id_str:
-            logger.warning("Metadata job missing book_id", payload=payload)
+            logger.warning("Metadata task missing book_id", payload=payload)
             return
 
         book_id = UUID(book_id_str)
@@ -44,7 +49,7 @@ class MetadataJobService:
             book = session.get(Book, book_id)
             if not book:
                 logger.warning(
-                    "Metadata job for non-existent book", book_id=book_id_str
+                    "Metadata task for non-existent book", book_id=book_id_str
                 )
                 return
 
@@ -108,9 +113,11 @@ class MetadataJobService:
                     self.metadata_manager.embed_metadata(book.file_path, metadata)
 
                 if self.settings.ORGANIZE_LIBRARY:
-                    log.info("Queueing organization job")
-                    self.job_queue.add_job(
-                        JobType.ORGANIZE,
+                    from .organize import OrganizeTask
+
+                    log.info("Queueing organization task")
+                    self.queue.add_task(
+                        OrganizeTask.TASK_TYPE,
                         payload={"book_id": str(book.id)},
                     )
 

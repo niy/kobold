@@ -1,3 +1,5 @@
+"""Task for ORGANIZE jobs."""
+
 from __future__ import annotations
 
 import asyncio
@@ -9,6 +11,7 @@ from sqlmodel import Session
 from ..logging_config import get_logger
 from ..models import Book
 from ..utils.hashing import get_file_hash
+from .base import Task
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
@@ -19,20 +22,21 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-class OrganizationJobService:
+class OrganizeTask(Task):
+    TASK_TYPE = "ORGANIZE"
+
     def __init__(
         self,
-        settings_obj: Settings,
-        db_engine: Engine,
+        settings: Settings,
+        engine: Engine,
         organizer: LibraryOrganizer,
     ):
-        self.settings = settings_obj
-        self.engine = db_engine
+        self.settings = settings
+        self.engine = engine
         self.organizer = organizer
 
-    async def process_job(self, payload: dict[str, Any]) -> None:
-        """
-        Process a library organization job.
+    async def process(self, payload: dict[str, Any]) -> None:
+        """Process a library organization task.
 
         This method is designed to be idempotent and robust against partial failures.
         """
@@ -41,7 +45,7 @@ class OrganizationJobService:
 
         book_id_str = payload.get("book_id")
         if not book_id_str:
-            logger.warning("Organization job missing book_id", payload=payload)
+            logger.warning("Organization task missing book_id", payload=payload)
             return
 
         book_id = UUID(book_id_str)
@@ -50,7 +54,7 @@ class OrganizationJobService:
             book = session.get(Book, book_id)
             if not book:
                 logger.warning(
-                    "Organization job for non-existent book", book_id=book_id_str
+                    "Organization task for non-existent book", book_id=book_id_str
                 )
                 return
 
@@ -59,7 +63,7 @@ class OrganizationJobService:
                 title=book.title,
                 current_path=book.file_path,
             )
-            log.info("Processing organization job")
+            log.info("Processing organization task")
 
             try:
                 current_path, expected_path = self.organizer.get_organize_path(book)

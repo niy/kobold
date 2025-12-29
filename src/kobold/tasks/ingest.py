@@ -1,3 +1,5 @@
+"""Task for INGEST jobs."""
+
 from __future__ import annotations
 
 import asyncio
@@ -8,36 +10,39 @@ from sqlmodel import Session, select
 
 from ..constants import SUPPORTED_EXTENSIONS
 from ..logging_config import get_logger
-from ..models import Book, JobType
+from ..models import Book
 from ..utils.hashing import get_file_hash
+from .base import Task
 
 if TYPE_CHECKING:
     import structlog
     from sqlalchemy.engine import Engine
 
     from ..config import Settings
-    from ..job_queue import JobQueue
+    from ..task_queue import TaskQueue
 
 logger = get_logger(__name__)
 
 
-class IngestService:
+class IngestTask(Task):
+    TASK_TYPE = "INGEST"
+
     def __init__(
         self,
-        settings_obj: Settings,
-        db_engine: Engine,
-        queue: JobQueue,
+        settings: Settings,
+        engine: Engine,
+        queue: TaskQueue,
     ):
-        self.settings = settings_obj
-        self.engine = db_engine
-        self.job_queue = queue
+        self.settings = settings
+        self.engine = engine
+        self.queue = queue
 
-    async def process_job(self, payload: dict[str, Any]) -> None:
+    async def process(self, payload: dict[str, Any]) -> None:
         event_type = payload.get("event")
         filepath_str = payload.get("path")
 
         if not filepath_str:
-            logger.warning("Ingest job missing path", payload=payload)
+            logger.warning("Ingest task missing path", payload=payload)
             return
 
         filepath = Path(filepath_str)
@@ -101,7 +106,6 @@ class IngestService:
                     original_path = Path(existing_book.file_path)
 
                     if original_path.exists():
-                        # Delete new file if it's a duplicate
                         try:
                             filepath.unlink()
                             log.info(
@@ -114,7 +118,6 @@ class IngestService:
                         return
 
                     else:
-                        # Heal broken link
                         log.info(
                             "Original file missing, healing link",
                             old_path=str(original_path),
@@ -127,9 +130,10 @@ class IngestService:
                         session.add(existing_book)
                         session.commit()
 
-                        # Trigger Organization to move it to correct location
-                        self.job_queue.add_job(
-                            JobType.ORGANIZE,
+                        from .organize import OrganizeTask
+
+                        self.queue.add_task(
+                            OrganizeTask.TASK_TYPE,
                             payload={"book_id": str(existing_book.id)},
                         )
                 else:
@@ -177,15 +181,19 @@ class IngestService:
                 file_hash=file_hash[:12],
             )
 
-            self.job_queue.add_job(
-                JobType.METADATA,
+            from .metadata import MetadataTask
+
+            self.queue.add_task(
+                MetadataTask.TASK_TYPE,
                 payload={"book_id": str(new_book.id)},
             )
 
             is_epub = filepath.suffix.lower() == ".epub"
             is_already_kepub = filepath.stem.lower().endswith(".kepub")
             if self.settings.CONVERT_EPUB and is_epub and not is_already_kepub:
-                self.job_queue.add_job(
-                    JobType.CONVERT,
+                from .convert import ConvertTask
+
+                self.queue.add_task(
+                    ConvertTask.TASK_TYPE,
                     payload={"book_id": str(new_book.id)},
                 )

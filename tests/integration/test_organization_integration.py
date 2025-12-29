@@ -6,21 +6,23 @@ import pytest
 from sqlmodel import Session, SQLModel, col, create_engine, select
 
 from kobold.config import Settings
-from kobold.job_queue import JobQueue
-from kobold.models import Book, Job, JobStatus
+from kobold.models import Book, TaskStatus
+from kobold.models import Task as TaskModel
 from kobold.scanner import ScannerService
-from kobold.worker import stop_event, worker
+from kobold.task_queue import TaskQueue
+from kobold.task_registry import create_tasks
+from kobold.worker import worker
 
 
-async def wait_for_jobs(engine, timeout_sec: float = 5.0) -> None:
+async def wait_for_tasks(engine, timeout_sec: float = 5.0) -> None:
     try:
         async with asyncio.timeout(timeout_sec):
             while True:
                 with Session(engine) as session:
                     pending = session.exec(
-                        select(Job).where(
-                            col(Job.status).in_(
-                                [JobStatus.PENDING, JobStatus.PROCESSING]
+                        select(TaskModel).where(
+                            col(TaskModel.status).in_(
+                                [TaskStatus.PENDING, TaskStatus.PROCESSING]
                             )
                         )
                     ).all()
@@ -33,10 +35,9 @@ async def wait_for_jobs(engine, timeout_sec: float = 5.0) -> None:
 
 @contextlib.asynccontextmanager
 async def run_worker(ctx):
-    stop_event.clear()
-
+    handlers = create_tasks(ctx["settings"], ctx["engine"], ctx["queue"])
     worker_task = asyncio.create_task(
-        worker(ctx["settings"], ctx["engine"], ctx["queue"])
+        worker(ctx["queue"], handlers, ctx["settings"].WORKER_POLL_INTERVAL)
     )
 
     await asyncio.sleep(0.05)
@@ -44,7 +45,6 @@ async def run_worker(ctx):
     try:
         yield
     finally:
-        stop_event.set()
         worker_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await worker_task
@@ -70,7 +70,7 @@ async def organize_ctx(tmp_path: Path, mock_kepub_converter):
         WORKER_POLL_INTERVAL=0.01,
     )
 
-    test_queue = JobQueue(test_settings, test_engine)
+    test_queue = TaskQueue(test_settings, test_engine)
 
     yield {
         "watch_dir": watch_dir,
@@ -100,7 +100,7 @@ async def organize_ctx_with_series(tmp_path: Path, mock_kepub_converter):
         WORKER_POLL_INTERVAL=0.01,
     )
 
-    test_queue = JobQueue(test_settings, test_engine)
+    test_queue = TaskQueue(test_settings, test_engine)
 
     yield {
         "watch_dir": watch_dir,
@@ -125,7 +125,7 @@ class TestOrganizationHappyPath:
         await scanner.scan_directories()
 
         async with run_worker(ctx):
-            await wait_for_jobs(ctx["engine"])
+            await wait_for_tasks(ctx["engine"])
 
         with Session(ctx["engine"]) as session:
             book = session.exec(
@@ -152,7 +152,7 @@ class TestOrganizationHappyPath:
         await scanner.scan_directories()
 
         async with run_worker(ctx):
-            await wait_for_jobs(ctx["engine"])
+            await wait_for_tasks(ctx["engine"])
 
         with Session(ctx["engine"]) as session:
             book = session.exec(
@@ -175,7 +175,7 @@ class TestOrganizationHappyPath:
         await scanner.scan_directories()
 
         async with run_worker(ctx):
-            await wait_for_jobs(ctx["engine"])
+            await wait_for_tasks(ctx["engine"])
 
         with Session(ctx["engine"]) as session:
             book = session.exec(select(Book).where(Book.file_format == "pdf")).first()
@@ -207,7 +207,7 @@ class TestOrganizationEdgeCases:
             WORKER_POLL_INTERVAL=0.01,
         )
 
-        test_queue = JobQueue(test_settings, test_engine)
+        test_queue = TaskQueue(test_settings, test_engine)
 
         ctx = {
             "watch_dir": watch_dir,
@@ -224,7 +224,7 @@ class TestOrganizationEdgeCases:
         await scanner.scan_directories()
 
         async with run_worker(ctx):
-            await wait_for_jobs(test_engine)
+            await wait_for_tasks(test_engine)
 
         with Session(test_engine) as session:
             book = session.exec(
@@ -248,7 +248,7 @@ class TestOrganizationEdgeCases:
         await scanner.scan_directories()
 
         async with run_worker(ctx):
-            await wait_for_jobs(ctx["engine"])
+            await wait_for_tasks(ctx["engine"])
 
         with Session(ctx["engine"]) as session:
             book = session.exec(
@@ -283,7 +283,7 @@ class TestOrganizationCollisionHandling:
         await scanner.scan_directories()
 
         async with run_worker(ctx):
-            await wait_for_jobs(ctx["engine"])
+            await wait_for_tasks(ctx["engine"])
 
         with Session(ctx["engine"]) as session:
             books = session.exec(
