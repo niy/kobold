@@ -13,7 +13,8 @@ WORKDIR /app
 
 ENV UV_COMPILE_BYTECODE=1
 
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
+COPY src ./src
 
 RUN uv sync --frozen --no-dev
 
@@ -44,7 +45,6 @@ COPY pyproject.toml /app/
 ENV PATH="/app/.venv/bin:$PATH"
 
 ENV KB_DATA_PATH=/data
-ENV PYTHONPATH=/app/src
 
 RUN mkdir -p /data
 
